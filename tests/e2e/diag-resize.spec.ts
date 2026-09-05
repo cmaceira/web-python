@@ -7,7 +7,7 @@
  * in `presentation.spec.ts` (VC-071); geometry regress (NFR-905) stays on
  * VC-409 / VC-435 in `layout.spec.ts`.
  */
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gzipSync } from 'node:zlib';
@@ -647,9 +647,7 @@ test('VC-912 (NFR-901, NFR-903, NFR-904): hit target, apply-height â‰¤ 50 ms, â‰
   for (const url of [...manifest.urls, '/index.html']) {
     if (url === '/') continue;
     if (isVendored(url)) continue;
-    const file = join(dist, url.replace(/^\//, ''));
-    if (!statSync(file).isFile()) continue;
-    gzippedApp += gzipSync(readFileSync(file), { level: 9 }).length;
+    gzippedApp += gzipSync(readFileSync(join(dist, url.replace(/^\//, ''))), { level: 9 }).length;
   }
   // Also count any first-party asset present on disk but not listed (none expected).
   void readdirSync(join(dist, 'assets'));
