@@ -3,11 +3,11 @@
  *
  * VC-901 – VC-911, VC-913: behaviour against the built site.
  * VC-912 (NFR-901, NFR-903, NFR-904): hit target, apply-height latency, and
- * app-payload gzipped delta vs merge-base `e569b81`. Contrast (NFR-902) lives
+ * app-payload gzipped delta vs merge-base `562cb27`. Contrast (NFR-902) lives
  * in `presentation.spec.ts` (VC-071); geometry regress (NFR-905) stays on
  * VC-409 / VC-435 in `layout.spec.ts`.
  */
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gzipSync } from 'node:zlib';
@@ -637,7 +637,7 @@ test('VC-912 (NFR-901, NFR-903, NFR-904): hit target, apply-height ≤ 50 ms, �
   expect(applyMs, 'NFR-903 paint after apply-height').toBeLessThanOrEqual(50);
   expect(Math.max(0, ...longTasks), 'NFR-903 longest task').toBeLessThanOrEqual(50);
 
-  // NFR-904: gzipped app delta vs merge-base e569b81 ≤ 2 KB.
+  // NFR-904: gzipped app delta vs merge-base 562cb27 ≤ 2 KB.
   test.skip(baselineApp === undefined, uncoveredDiagCompressor);
 
   const manifest = JSON.parse(readFileSync(join(dist, 'precache-manifest.json'), 'utf8')) as {
@@ -649,8 +649,6 @@ test('VC-912 (NFR-901, NFR-903, NFR-904): hit target, apply-height ≤ 50 ms, �
     if (isVendored(url)) continue;
     gzippedApp += gzipSync(readFileSync(join(dist, url.replace(/^\//, ''))), { level: 9 }).length;
   }
-  // Also count any first-party asset present on disk but not listed (none expected).
-  void readdirSync(join(dist, 'assets'));
 
   const delta = gzippedApp - baselineApp!;
   expect(

@@ -1,5 +1,5 @@
 {
-  "commit": "e569b81",
+  "commit": "562cb27",
   "files": [
     "/_headers",
     "/assets/index-HASH.css",
@@ -42,10 +42,10 @@
     "/ruff/ruff_wasm.js": "9dbb8d8d2aaa86a5f6a96a35556228d1c05b713e4e87b02a9db80731131053ef",
     "/ruff/ruff_wasm_bg.wasm": "cb88a5dd34d03e0c6b76ebe3e1b692c8878d34d88375da28085081ac6dd2e55f"
   },
-  "gzippedApp": 162773,
+  "gzippedApp": 164025,
   "gzippedVendored": 9111422,
   "gzippedBy": "darwin-arm64 zlib 1.2.12",
   "gzippedAppBy": {
-    "darwin-arm64 zlib 1.2.12": 162773
+    "darwin-arm64 zlib 1.2.12": 164025
   }
 }

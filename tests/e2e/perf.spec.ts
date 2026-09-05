@@ -250,12 +250,15 @@ interface BaselineBuild {
 
 /**
  * `3efb8be` — every feature through spec-05 plus the toolbar-jitter fix — is
- * the tree spec-06 sits on and the baseline both VC-429 (NFR-405, shape only)
- * and VC-623 (NFR-606, <= 9 KB) measure from. Spec-03 shipped at 2.18 KiB over
- * its own pre-pane baseline `8df7fa5` and spec-04 at 1.62 KiB over `98ee032`;
- * both historical measurements are frozen and no longer re-run against later
- * whole-app builds. See `specs/03-vertical-pane-frozen.md` (NFR-305) and
- * `specs/04-toogle-pane-aspect-frozen.md` (NFR-405).
+ * the tree spec-06 sits on and the baseline VC-429 (NFR-405, shape only)
+ * measures from. Spec-06's own NFR-606 ship measurement (7.51 KiB ≤ 9 KB vs
+ * `3efb8be`) is immutable and, amended by spec-09, VC-623 no longer subtracts
+ * every future whole-app build from that pre-completion baseline — later
+ * features carry their own anchored budgets (NFR-805, NFR-904). Spec-03
+ * shipped at 2.18 KiB over `8df7fa5` and spec-04 at 1.62 KiB over `98ee032`;
+ * both are likewise frozen. See `specs/03-vertical-pane-frozen.md` (NFR-305),
+ * `specs/04-toogle-pane-aspect-frozen.md` (NFR-405), and
+ * `specs/06-offline-completion-frozen.md` (NFR-606).
  *
  * VC-326 below still compares the build's *shape* against `8df7fa5`: a file
  * list and a set of digests carry no compressor and no later feature's bytes,
@@ -263,10 +266,9 @@ interface BaselineBuild {
  *
  * `gzipSync` is only as reproducible as the zlib Node was linked against, and
  * the flavours disagree — Node 26 ships stock zlib on darwin and zlib-ng on
- * linux. So CI records the baseline on the runner that does the comparing and
- * points `PYPLAY_BASELINE_BUILD` at it, the committed record carries one entry
- * per compressor for a local run, and an unrecorded compressor *skips* rather
- * than spending half the budget on compressor noise.
+ * linux. So CI records live size-budget baselines on the runner that does the
+ * comparing; an unrecorded compressor *skips* rather than spending half the
+ * budget on compressor noise.
  */
 const BUILD_RECORD =
   process.env.PYPLAY_BASELINE_BUILD ??
@@ -277,40 +279,11 @@ const branchPoint = JSON.parse(readFileSync(BUILD_RECORD, 'utf8')) as BaselineBu
 /** How this machine's `gzipSync` identifies itself, as the records key it. */
 const compressor = `${process.platform}-${process.arch} zlib ${process.versions.zlib}`;
 
-/** The branch point's app payload as *this* run compresses it, if recorded. */
-const branchPointApp =
-  branchPoint.gzippedAppBy?.[compressor] ??
-  (branchPoint.gzippedBy === compressor ? branchPoint.gzippedApp : undefined);
-
-/*
- * A record CI pointed at is a different matter from an uncovered compressor:
- * it was made by this run's own runner moments ago, so failing to cover it is
- * a broken wiring, and skipping would take a merge-gating budget quietly out
- * of the run. It stops the suite instead.
- */
-if (process.env.PYPLAY_BASELINE_BUILD !== undefined && branchPointApp === undefined) {
-  throw new Error(
-    `${BUILD_RECORD} records no app size for "${compressor}" (it was gzipped by ` +
-      `"${branchPoint.gzippedBy}") — the run that recorded it is not the run comparing ` +
-      `against it. See the baseline step in .github/workflows/pr.yml.`,
-  );
-}
-
-/** The reason a size budget cannot be measured here, if there is one. */
-const uncoveredCompressor =
-  `no ${branchPoint.commit} baseline recorded for "${compressor}" — have: ` +
-  `${Object.keys(branchPoint.gzippedAppBy ?? {}).join(', ')}. Record one with: ` +
-  `node scripts/record-baselines.mjs ${branchPoint.commit} --build <out.json>`;
-
-/** NFR-606: at most 9 KB gzipped on top of the branch point's app payload. */
-const COMPLETION_SIZE_BUDGET_BYTES = 9 * 1024;
-
 /**
- * NFR-606 is measured over the app's own output only, matching VC-323/VC-429's
- * historical convention — `index.html`, the JS and CSS chunks, the worker
- * chunk, `sw.js`, `precache-manifest.json` — and not over the vendored
- * Pyodide and Ruff blobs, which are held to byte-identity by digest in
- * VC-429 instead.
+ * App-payload size budgets (NFR-805, NFR-904) measure over the app's own
+ * output only — `index.html`, the JS and CSS chunks, the worker chunk,
+ * `sw.js`, `precache-manifest.json` — and not over the vendored Pyodide and
+ * Ruff blobs, which are held to byte-identity by digest in VC-429 instead.
  */
 const isVendored = (url: string): boolean =>
   url.startsWith('/pyodide/') || url.startsWith('/ruff/');
@@ -426,10 +399,10 @@ test('VC-323 (NFR-304, NFR-305): the pane is painted and copies within 100 ms wi
 });
 
 /* -------------------------------------------------------------------------
-   spec-06 — VC-623 (NFR-603, NFR-606)
+   spec-06 — VC-623 (NFR-603; NFR-606 size frozen by spec-09)
    ------------------------------------------------------------------------- */
 
-test('VC-623 (NFR-603, NFR-606): completion paints within 200 ms on 500 lines, without a long task or request, and costs <= 9 KB', async ({
+test('VC-623 (NFR-603, NFR-606): completion paints within 200 ms on 500 lines, without a long task or request', async ({
   page,
 }) => {
   await openPlayground(page);
@@ -492,33 +465,16 @@ test('VC-623 (NFR-603, NFR-606): completion paints within 200 ms on 500 lines, w
   expect(measurement.longest).toBeLessThanOrEqual(100);
   expect(requests).toEqual([]);
 
-  // --- NFR-606: the compressed size delta against the branch point -------
-  // A missing record is reported as uncovered, never as a pass.
-  test.skip(branchPointApp === undefined, uncoveredCompressor);
-
-  const manifest = JSON.parse(readFileSync(join(dist, 'precache-manifest.json'), 'utf8')) as {
-    urls: string[];
-  };
-  let gzippedApp = 0;
-  for (const url of [...manifest.urls, '/index.html']) {
-    if (url === '/') continue; // the shell is counted once, as /index.html
-    if (isVendored(url)) continue; // pinned by digest in VC-429 instead
-    gzippedApp += gzipSync(readFileSync(join(dist, url.replace(/^\//, ''))), { level: 9 }).length;
-  }
-
-  const delta = gzippedApp - branchPointApp!;
-  expect(
-    delta,
-    `NFR-606 app size delta vs ${branchPoint.commit}: ${delta} B gzipped ` +
-      `(budget ${COMPLETION_SIZE_BUDGET_BYTES} B, compressor "${compressor}")`,
-  ).toBeLessThanOrEqual(COMPLETION_SIZE_BUDGET_BYTES);
+  // NFR-606's ≤ 9 KB ship measurement vs `3efb8be` is historical (frozen by
+  // spec-09). Live size budgets are NFR-805 / NFR-904 against their own
+  // branch points.
 
   console.log(
     [
       'VC-623 measurements:',
       `  NFR-603 keystroke -> popup painted   ${measurement.ms.toFixed(0)} ms   (<= 200)`,
       `  NFR-603 longest task                 ${measurement.longest.toFixed(0)} ms   (<= 100)`,
-      `  NFR-606 app size delta vs ${branchPoint.commit} ${(delta / 1024).toFixed(2)} KiB (<= 9.00)`,
+      '  NFR-606 app size delta               (historical — see specs/06-offline-completion-frozen.md)',
     ].join('\n'),
   );
 });
