@@ -92,7 +92,7 @@ test('VC-041 (FR-039): activating an entry scrolls to it and places the caret', 
     .poll(() => diagnosticEntries(page), { timeout: LINT_SETTLE_MS + 2000 })
     .toEqual(['40:7 · F821 · Undefined name `faltante`']);
 
-  // Vertical header-only default clips entries; enlarge so the click lands.
+  // Vertical content-floor default may clip entries; enlarge so the click lands.
   const diagResizer = page.locator('#diag-resizer');
   if (await diagResizer.isVisible()) {
     await diagResizer.focus();

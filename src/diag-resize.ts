@@ -102,17 +102,26 @@ export function maxDiagHeight(
 }
 
 /**
- * FR-901 / FR-907: header-only minimum from the Problems title row height plus
- * `.panel--diagnostics` padding (content-derived; not a hard-coded px).
+ * FR-901 / FR-907: content-derived minimum matching the stacked (horizontal)
+ * panel's natural empty height — Problems title row, title→body gap, one empty
+ * / body line, and `.panel--diagnostics` padding (not a hard-coded px).
  */
 export function minDiagHeightFromMeasurements(m: {
   titleHeight: number;
+  titleMarginBottom: number;
+  bodyHeight: number;
   panelPaddingTop: number;
   panelPaddingBottom: number;
 }): number {
   return Math.max(
     1,
-    Math.ceil(m.titleHeight + m.panelPaddingTop + m.panelPaddingBottom),
+    Math.ceil(
+      m.titleHeight +
+        m.titleMarginBottom +
+        m.bodyHeight +
+        m.panelPaddingTop +
+        m.panelPaddingBottom,
+    ),
   );
 }
 
@@ -161,12 +170,30 @@ export function mountDiagResizer(options: DiagResizerOptions): DiagResizerHandle
     getEffectiveLayout() === 'vertical' &&
     window.matchMedia(`(min-width: ${LAYOUT_MIN_WIDTH}px)`).matches;
 
+  /**
+   * Intrinsic height of the empty-state line. Stable whether findings are
+   * showing (empty is `hidden`) or the body is flex-collapsed to 0 — matches
+   * the stacked layout's content-sized empty panel (FR-901).
+   */
+  const measureBodyMin = (): number => {
+    const empty = diagnostics.querySelector<HTMLElement>('.diagnostics-empty');
+    if (!empty) return 0;
+    const wasHidden = empty.hidden;
+    empty.hidden = false;
+    const height = empty.scrollHeight;
+    empty.hidden = wasHidden;
+    return height;
+  };
+
   const measureMin = (): number => {
     const title = diagnostics.querySelector<HTMLElement>('.panel-title');
     const titleHeight = title?.getBoundingClientRect().height ?? 0;
+    const titleStyle = title ? getComputedStyle(title) : null;
     const style = getComputedStyle(diagnostics);
     return minDiagHeightFromMeasurements({
       titleHeight,
+      titleMarginBottom: Number.parseFloat(titleStyle?.marginBottom ?? '') || 0,
+      bodyHeight: measureBodyMin(),
       panelPaddingTop: Number.parseFloat(style.paddingTop) || 0,
       panelPaddingBottom: Number.parseFloat(style.paddingBottom) || 0,
     });
@@ -205,7 +232,7 @@ export function mountDiagResizer(options: DiagResizerOptions): DiagResizerHandle
     if (!active) return;
 
     currentMin = measureMin();
-    // Pin to the header-only floor before measuring the column so an oversize
+    // Pin to the content floor before measuring the column so an oversize
     // bootstrap `--diagnostics-height` cannot inflate the FR-908 max (VC-908).
     document.documentElement.style.setProperty('--diagnostics-height', `${currentMin}px`);
     currentMax = maxDiagHeight(measureRightColumnHeight());
@@ -259,7 +286,7 @@ export function mountDiagResizer(options: DiagResizerOptions): DiagResizerHandle
   resizer.addEventListener('keydown', handleKey);
   // FR-908: continuous viewport resize while staying vertical ≥ 900.
   window.addEventListener('resize', sync);
-  // Re-measure once fonts settle so the header-only min matches paint (FR-901).
+  // Re-measure once fonts settle so the content min matches paint (FR-901).
   void document.fonts.ready.then(() => {
     if (app.isConnected) sync();
   });

@@ -29,8 +29,9 @@
     </script>
     <!-- FR-910: apply a canonical stored diagnostics height before CSS paint so
          vertical layout never flashes the old fr share. Non-canonical / missing
-         → leave unset; CSS defaults the track to header-only (FR-901 / FR-911).
-         Regex matches src/diag-resize.ts isCanonicalDiagHeight. -->
+         → leave unset; CSS defaults the track to the content-sized empty
+         minimum (FR-901 / FR-911). Regex matches src/diag-resize.ts
+         isCanonicalDiagHeight. -->
     <script>
       (function () {
         var KEY = 'pyplay.diagnostics-height.v1';

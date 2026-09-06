@@ -221,24 +221,30 @@ describe('maxDiagHeight (FR-908)', () => {
 });
 
 describe('minDiagHeightFromMeasurements (FR-901 / FR-907)', () => {
-  it('sums title height and panel padding, ceil, and never below 1', () => {
+  it('sums title, gap, body line and panel padding, ceil, and never below 1', () => {
     expect(
       minDiagHeightFromMeasurements({
         titleHeight: 20,
+        titleMarginBottom: 4,
+        bodyHeight: 16,
         panelPaddingTop: 6,
-        panelPaddingBottom: 0,
+        panelPaddingBottom: 6,
       }),
-    ).toBe(26);
+    ).toBe(52);
     expect(
       minDiagHeightFromMeasurements({
         titleHeight: 20.2,
+        titleMarginBottom: 4,
+        bodyHeight: 16.4,
         panelPaddingTop: 6.4,
-        panelPaddingBottom: 0,
+        panelPaddingBottom: 6.1,
       }),
-    ).toBe(27);
+    ).toBe(54);
     expect(
       minDiagHeightFromMeasurements({
         titleHeight: 0,
+        titleMarginBottom: 0,
+        bodyHeight: 0,
         panelPaddingTop: 0,
         panelPaddingBottom: 0,
       }),

@@ -494,21 +494,22 @@ In the stacked (`horizontal`) layout the diagnostics panel keeps its
 `max-height: 25vh`. That behaviour is unchanged.
 
 In the two-column (`vertical`) layout at ≥ 900 px the Problems panel under
-Input starts **header-only** — tall enough for the Problems title and live
-count, not a free-space fraction — so the console keeps the room. Visitors who
-need the list enlarge it; the chosen height is remembered on this origin. This
-is not a hide or collapse of either panel (issue #21); both stay in the
-layout.
+Input starts at the same **content-sized empty height** as the stacked
+(`horizontal`) layout — Problems title, live count, and empty/body line, not a
+free-space fraction — so the console keeps the room. Visitors who need a taller
+list enlarge it; the chosen height is remembered on this origin. This is not a
+hide or collapse of either panel (issue #21); both stay in the layout.
 
 #### How the height is applied
 
 The right-column grid rows are: console `minmax(80px, 1fr)`, an 8 px separator
 track (`diagsep`), content-sized stdin, then diagnostics sized by the CSS
 custom property `--diagnostics-height` on `document.documentElement`. When that
-property is unset, the diagnostics track is `auto` and flex layout collapses
-the list / empty body (`flex-basis: 0` with `min-height: 0`) so only the title
-row contributes intrinsic height — never an `fr` share — because a
-content-derived default must paint without waiting on JavaScript measurement.
+property is unset, the diagnostics track is `auto`: the empty state keeps its
+intrinsic line (matching horizontal) while the findings list stays
+flex-collapsed (`flex-basis: 0` with `min-height: 0`) so a content-derived
+default paints without waiting on JavaScript measurement and without an `fr`
+share.
 
 A render-blocking bootstrap in `index.html` reads
 `pyplay.diagnostics-height.v1` and, when the value is a canonical integer
@@ -527,18 +528,20 @@ HTML `disabled` attribute — so every activation path is a no-op.
 
 #### Bounds and persistence
 
-The minimum height is content-derived from the Problems title row plus the
-diagnostics panel's padding, so font inflation cannot clip the count. The
-maximum is the lesser of 40 % of the right column's height (console top to
-diagnostics bottom) and the height that still leaves the console its 80 px
-floor — whichever bound is hit first, expressed as an integer CSS-px height.
+The minimum height is content-derived from the Problems title row, its margin,
+one empty/body line, and the diagnostics panel's padding — matching the stacked
+layout's natural empty height so font inflation cannot clip the count or the
+empty line. The maximum is the lesser of 40 % of the right column's height
+(console top to diagnostics bottom) and the height that still leaves the
+console its 80 px floor — whichever bound is hit first, expressed as an integer
+CSS-px height.
 
 Committed resizes (pointer release, or a keyboard step that changes height)
 write a canonical decimal integer string (no units, no leading zero) to
 `localStorage['pyplay.diagnostics-height.v1']`. A clamp caused only by
 viewport or layout change updates the in-memory height and `aria-valuenow` but
 does **not** rewrite storage until the visitor next commits a resize. Missing
-or non-canonical stored values are treated as absent (header-only default) and
+or non-canonical stored values are treated as absent (content-sized default) and
 left in place. A rejected write still applies the height for the session and
 shows `Diagnostics height won't be remembered` at most once per page load.
 

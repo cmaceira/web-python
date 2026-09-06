@@ -553,7 +553,7 @@ for (const viewport of [
     await openPlayground(page, { seedLayout: false });
     await waitForPythonReady(page);
     await waitForLinter(page);
-    // Seed findings. Vertical defaults to header-only (spec-09), so entries
+    // Seed findings. Vertical defaults to a short content floor (spec-09), so entries
     // stay in the document but may be clipped — assert attachment, not paint.
     await runProgram(page, 'import os\nx=1\n');
     await expect(page.locator('#diagnostics-list .diagnostic-entry').first()).toBeAttached();
@@ -993,7 +993,7 @@ test.describe('the layout control', () => {
     await waitForLinter(page);
     await runProgram(page, 'import os\nx=1\n');
     await expect(page.locator('#diagnostics-list .diagnostic-entry').first()).toBeAttached();
-    // Header-only default clips entries; enlarge so Tab can land on one.
+    // Content-floor default may clip entries; enlarge so Tab can land on one.
     const diagResizer = page.locator('#diag-resizer');
     await diagResizer.focus();
     for (let i = 0; i < 20; i++) await diagResizer.press('ArrowUp');
@@ -1359,7 +1359,7 @@ test('VC-407 (FR-049 from spec-01, FR-405): Tab reaches every control once in bo
   // Switch through the control itself, then enumerate again.
   await page.click(RADIOS.vertical);
   expect(await renderedLayout(page)).toBe('vertical');
-  // Header-only default clips entries; enlarge so Tab reaches one.
+  // Content-floor default may clip entries; enlarge so Tab reaches one.
   const diagResizer = page.locator('#diag-resizer');
   await diagResizer.focus();
   for (let i = 0; i < 20; i++) await diagResizer.press('ArrowUp');

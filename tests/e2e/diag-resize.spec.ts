@@ -109,6 +109,8 @@ function panelGeometry(page: Page): Promise<{
   rightH: number;
   resizer: { top: number; bottom: number; height: number; consoleBottom: number; stdinTop: number };
   titleH: number;
+  titleMarginBottom: number;
+  bodyH: number;
   panelPad: number;
 }> {
   return page.evaluate(() => {
@@ -118,11 +120,17 @@ function panelGeometry(page: Page): Promise<{
     const stdin = document.querySelector('.panel--stdin') as HTMLElement;
     const resizer = document.getElementById('diag-resizer') as HTMLElement;
     const title = diag.querySelector('.panel-title') as HTMLElement;
+    const empty = diag.querySelector('.diagnostics-empty') as HTMLElement;
     const style = getComputedStyle(diag);
+    const titleStyle = getComputedStyle(title);
     const d = diag.getBoundingClientRect();
     const c = consolePanel.getBoundingClientRect();
     const s = stdin.getBoundingClientRect();
     const r = resizer.getBoundingClientRect();
+    const wasHidden = empty.hidden;
+    empty.hidden = false;
+    const bodyH = empty.scrollHeight;
+    empty.hidden = wasHidden;
     return {
       diagH: d.height,
       consoleH: c.height,
@@ -136,6 +144,8 @@ function panelGeometry(page: Page): Promise<{
         stdinTop: s.top,
       },
       titleH: title.getBoundingClientRect().height,
+      titleMarginBottom: Number.parseFloat(titleStyle.marginBottom) || 0,
+      bodyH,
       panelPad:
         (Number.parseFloat(style.paddingTop) || 0) +
         (Number.parseFloat(style.paddingBottom) || 0),
@@ -156,29 +166,55 @@ function intersectsDiagClient(page: Page, selector: string): Promise<boolean> {
   }, selector);
 }
 
-test('VC-901 (FR-901, FR-902, BR-901): header-only default hides entries and empty text', async ({
+test('VC-901 (FR-901, FR-902, BR-901): default min matches horizontal empty height', async ({
   page,
 }) => {
-  await openVertical(page, null);
+  // Horizontal (stacked) empty panel height is the reference floor.
+  await seedStorage(page, { layout: 'horizontal', diagHeight: null });
+  await openPlayground(page, { seedLayout: false });
+  await waitForPythonReady(page);
+  await waitForLinter(page);
+  await setProgram(page, 'x = 1\n');
+  await expect.poll(() => diagnosticEntries(page)).toEqual([]);
+  await expect(page.locator('#diagnostics-empty')).toBeVisible();
+  const horizontalH = await page.evaluate(() => {
+    const diag = document.querySelector('.panel--diagnostics') as HTMLElement;
+    return diag.getBoundingClientRect().height;
+  });
 
-  // With seeded diagnostics: entries stay in the document but not in the client rect.
-  await seedDiagnostics(page, 2);
+  // Fresh vertical load (no stored height) must match that floor.
+  await openVertical(page, null);
+  await setProgram(page, 'x = 1\n');
+  await expect.poll(() => diagnosticEntries(page)).toEqual([]);
+  await expect(page.locator('#diagnostics-empty')).toBeVisible();
+  expect(await intersectsDiagClient(page, '#diagnostics-empty')).toBe(true);
+  // Empty copy sits under the title — not vertically centered in leftover space.
+  const emptyPlacement = await page.evaluate(() => {
+    const title = document.querySelector('.panel--diagnostics .panel-title') as HTMLElement;
+    const empty = document.getElementById('diagnostics-empty') as HTMLElement;
+    const t = title.getBoundingClientRect();
+    const e = empty.getBoundingClientRect();
+    return { gap: e.top - t.bottom, emptyH: e.height };
+  });
+  expect(emptyPlacement.gap, 'empty directly under title').toBeGreaterThanOrEqual(0);
+  expect(emptyPlacement.gap, 'empty directly under title').toBeLessThanOrEqual(12);
+
   let g = await panelGeometry(page);
-  const minFromContent = Math.ceil(g.titleH + g.panelPad);
-  expect(g.diagH, 'header-only height').toBeGreaterThanOrEqual(minFromContent - 2);
-  expect(g.diagH, 'header-only height').toBeLessThanOrEqual(minFromContent + 2);
-  expect(await intersectsDiagClient(page, '.diagnostic-entry')).toBe(false);
-  expect(await page.locator('.diagnostic-entry').count()).toBeGreaterThan(0);
+  const minFromContent = Math.ceil(
+    g.titleH + g.titleMarginBottom + g.bodyH + g.panelPad,
+  );
+  expect(g.diagH, 'content min height').toBeGreaterThanOrEqual(minFromContent - 2);
+  expect(g.diagH, 'content min height').toBeLessThanOrEqual(minFromContent + 2);
+  expect(g.diagH, 'matches horizontal empty height').toBeGreaterThanOrEqual(horizontalH - 2);
+  expect(g.diagH, 'matches horizontal empty height').toBeLessThanOrEqual(horizontalH + 2);
   expect(g.consoleContentH, 'console content-box ≥ 80').toBeGreaterThanOrEqual(DIAG_CONSOLE_MIN);
   expect(g.diagH / g.rightH, 'diag ≤ 15 % of right column').toBeLessThanOrEqual(0.15);
 
-  // Empty state: clear findings and assert the empty line is also clipped.
-  await setProgram(page, 'x = 1\n');
-  await expect.poll(() => diagnosticEntries(page)).toEqual([]);
-  await expect(page.locator('#diagnostics-empty')).toBeAttached();
-  expect(await intersectsDiagClient(page, '#diagnostics-empty')).toBe(false);
+  // With findings the floor is unchanged (empty-line sized); list does not grow it.
+  await seedDiagnostics(page, 2);
   g = await panelGeometry(page);
-  expect(g.diagH).toBeLessThanOrEqual(Math.ceil(g.titleH + g.panelPad) + 2);
+  expect(g.diagH, 'findings do not inflate the default').toBeLessThanOrEqual(minFromContent + 2);
+  expect(await page.locator('.diagnostic-entry').count()).toBeGreaterThan(0);
 });
 
 test('VC-902 (FR-903, FR-913): separator between console and stdin with ARIA contract', async ({
@@ -243,7 +279,7 @@ test('VC-903 (FR-904, FR-908): pointer drag upward clamps at 40 % / console ≥ 
   expect(now).toBeLessThanOrEqual(Math.round(g.diagH) + 1);
 });
 
-test('VC-904 (FR-904, FR-907): pointer drag downward stops at header-only minimum', async ({
+test('VC-904 (FR-904, FR-907): pointer drag downward stops at content minimum', async ({
   page,
 }) => {
   await openVertical(page, null);
@@ -500,20 +536,18 @@ test('VC-911 (FR-914, BR-905): resize leaves editor/console/layout/theme alone; 
 test('VC-913 (end-to-end): enlarge, persist, layout and viewport round-trip', async ({ page }) => {
   await openVertical(page, null);
   await seedDiagnostics(page, 3);
-  expect(await intersectsDiagClient(page, '.diagnostic-entry')).toBe(false);
-
   const resizer = page.locator('#diag-resizer');
+  const min = Number(await resizer.getAttribute('aria-valuemin'));
+  expect(Number(await resizer.getAttribute('aria-valuenow')), 'starts at content min').toBe(min);
+
+  // Enlarge past the content floor so a restored height is distinguishable.
   await resizer.focus();
-  let visible = false;
-  for (let i = 0; i < 40; i++) {
+  for (let i = 0; i < 10; i++) {
     await resizer.press('ArrowUp');
-    if (await intersectsDiagClient(page, '.diagnostic-entry')) {
-      visible = true;
-      break;
-    }
   }
-  expect(visible, 'keyboard enlarge reveals an entry').toBe(true);
   const restored = Number(await resizer.getAttribute('aria-valuenow'));
+  expect(restored, 'keyboard enlarge past min').toBeGreaterThan(min);
+  expect(await intersectsDiagClient(page, '.diagnostic-entry')).toBe(true);
 
   await page.reload();
   await page.waitForSelector('.cm-content');

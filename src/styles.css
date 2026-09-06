@@ -1090,7 +1090,7 @@ body {
      * flexible track with FR-409's 80 px floor; `diagsep` is the separator hit
      * target (NFR-901); stdin stays content-sized; diagnostics is a definite
      * `--diagnostics-height` when stored (FR-910), otherwise `auto` so the
-     * panel's header-only intrinsic size (flex-collapsed body, D-02) wins —
+     * panel's content-sized empty height (title + empty line, D-02) wins —
      * never an `fr` share of free space.
      */
     grid-template-rows:
@@ -1157,12 +1157,11 @@ body {
 
   /*
    * FR-409 / FR-901: vertical diagnostics height is the `diag` track
-   * (`--diagnostics-height` or header-only auto), not the stacked layout's
-   * `25vh`. Overflow is clipped on the panel; the list scrolls when the track
-   * is taller than the header (VC-435). Flex-collapsed list/empty keep
-   * intrinsic height header-only when the track is `auto` (BR-901 / D-02).
-   * Bottom padding is folded into the title so a 0-height body sits flush with
-   * the panel's content edge and entry boxes do not intersect the client rect.
+   * (`--diagnostics-height` or content-sized auto), not the stacked layout's
+   * `25vh`. Overflow is clipped on the panel; the list scrolls inside the
+   * track (VC-435). Empty keeps its intrinsic line so an `auto` track matches
+   * the stacked panel's natural empty height (BR-901); the list stays
+   * flex-collapsed so findings cannot inflate the default (D-02).
    */
   #app[data-layout='vertical'] .panel--diagnostics {
     max-height: none;
@@ -1170,23 +1169,27 @@ body {
     flex-direction: column;
     min-height: 0;
     overflow: hidden;
-    padding-bottom: 0;
   }
 
   #app[data-layout='vertical'] .panel--diagnostics .panel-title {
     flex: 0 0 auto;
-    margin-bottom: 0;
-    padding-bottom: 4px;
+    order: 0;
   }
 
-  /* BR-901: body stays in the document; flex-basis 0 + min-height 0 so it does
-     not inflate an `auto` track (FR-901) and fills leftover space when the
-     track has a definite `--diagnostics-height`. */
-  #app[data-layout='vertical'] .panel--diagnostics .diagnostics-list,
+  /* BR-901: empty sits directly under the title (DOM order is title → list →
+     empty; `order` keeps the message top-aligned like horizontal). List grows
+     below so findings scroll when `--diagnostics-height` is definite. */
   #app[data-layout='vertical'] .panel--diagnostics .diagnostics-empty {
+    flex: 0 0 auto;
+    min-height: auto;
+    order: 1;
+  }
+
+  #app[data-layout='vertical'] .panel--diagnostics .diagnostics-list {
     flex: 1 1 0;
     min-height: 0;
     overflow: auto;
+    order: 2;
   }
 
   /* FR-903 / NFR-901: separator between console and stdin; ≥ 8 px hit target.
