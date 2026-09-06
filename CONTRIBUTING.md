@@ -124,13 +124,15 @@ false })`, so the environment cannot overwrite the value they are asserting on.
 
 ### Re-recording the pinned baselines
 
-Four records pin what a build is compared against:
+Records pin what a build is compared against:
 
 | Record | Criterion | Pinned commit |
 |---|---|---|
 | `tests/e2e/baseline-build.json` | VC-326 (spec-03, build shape) | `8df7fa5` |
-| `tests/e2e/baseline-build-completion.json` | VC-429 (shape only) and VC-623 (≤ 9 KB) | `3efb8be` |
-| `tests/e2e/baseline-build-theme.json` | VC-513 (spec-05, ≤ 4 KB) | `0a4194f` |
+| `tests/e2e/baseline-build-completion.json` | VC-429 (shape only); NFR-606 size historical | `3efb8be` |
+| `tests/e2e/baseline-build-about.json` | VC-814 (NFR-805, ≤ 4 KB) | `e569b81` |
+| `tests/e2e/baseline-build-diag-resize.json` | VC-912 (NFR-904, ≤ 2 KB) | `562cb27` |
+| `tests/e2e/baseline-build-theme.json` | VC-513 (spec-05, shape / latency) | `0a4194f` |
 | `tests/e2e/baseline-geometry.json` | VC-408 (spec-04, ±1 px) | `384cb70` |
 
 `baseline-geometry.json` records the **stacked** rendering, which is what
@@ -149,17 +151,18 @@ environments reports the environment as a regression:
   linux arches differ by 2 B over this app payload.
 
 So `pr.yml` builds the pinned commits on the runner and records its own before
-each suite, pointing `PYPLAY_BASELINE_GEOMETRY` and `PYPLAY_BASELINE_BUILD` at
-them. The committed records are the fallback for a local run: a geometry
-record names the environment it was made on and the size records are keyed by
-compressor, and a run matching neither **skips** rather than reporting a pass
-it did not earn.
+each suite, pointing `PYPLAY_BASELINE_GEOMETRY`, `PYPLAY_BASELINE_BUILD`, and
+`PYPLAY_BASELINE_DIAG_RESIZE` at them. The committed records are the fallback
+for a local run: a geometry record names the environment it was made on and
+the size records are keyed by compressor, and a run matching neither **skips**
+rather than reporting a pass it did not earn.
 
 One command records either, from a throwaway worktree it cleans up after:
 
 ```bash
 node scripts/record-baselines.mjs 384cb70 --geometry tests/e2e/baseline-geometry.json
 node scripts/record-baselines.mjs 3efb8be --build    tests/e2e/baseline-build-completion.json
+node scripts/record-baselines.mjs 562cb27 --build    tests/e2e/baseline-build-diag-resize.json
 ```
 
 Commit the result only when it is your own environment's record of a commit

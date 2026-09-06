@@ -92,6 +92,13 @@ test('VC-041 (FR-039): activating an entry scrolls to it and places the caret', 
     .poll(() => diagnosticEntries(page), { timeout: LINT_SETTLE_MS + 2000 })
     .toEqual(['40:7 · F821 · Undefined name `faltante`']);
 
+  // Vertical content-floor default may clip entries; enlarge so the click lands.
+  const diagResizer = page.locator('#diag-resizer');
+  if (await diagResizer.isVisible()) {
+    await diagResizer.focus();
+    for (let i = 0; i < 20; i++) await diagResizer.press('ArrowUp');
+  }
+
   // Line 40 is far outside the initial viewport of a 100-line file.
   const entry = page.locator('#diagnostics-list .diagnostic-entry').first();
   await entry.click();

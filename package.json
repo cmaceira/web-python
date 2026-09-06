@@ -11,7 +11,7 @@
     "test:e2e": "playwright test",
     "test": "vitest run && playwright test && npm run test:matrix",
     "vendor": "node scripts/vendor-pyodide.mjs && node scripts/vendor-ruff.mjs",
-    "audit:perf": "playwright test --project=chromium --grep \"VC-053|VC-323|VC-326|VC-513|VC-623|VC-814\"",
+    "audit:perf": "playwright test --project=chromium --grep \"VC-053|VC-323|VC-326|VC-513|VC-623|VC-814|VC-912\"",
     "audit:contrast": "playwright test --project=chromium --grep \"VC-051|VC-071|VC-514|VC-622|VC-815\"",
     "test:matrix": "MATRIX=1 playwright test --workers=1 --project=chrome-141 --project=chrome-140 --project=edge-141 --project=edge-140 --project=firefox-145 --project=firefox-144 --project=safari-26.1 --project=safari-26.0"
   },

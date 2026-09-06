@@ -146,9 +146,23 @@ test.describe('375 px viewport', () => {
  * as editor markers and as panel entries), and a notice.
  */
 async function paintEverySurface(page: Page): Promise<void> {
-  await openPlayground(page);
+  // spec-09: `#diag-resizer` is only painted in vertical ≥ 900. Seed before
+  // navigation so contrast samples can include it without a pointer click that
+  // would clear `:focus-visible` for later focus-ring measurements.
+  await page.addInitScript(() => {
+    try {
+      window.localStorage.setItem('pyplay.layout.v2', 'vertical');
+    } catch {
+      /* ignore */
+    }
+  });
+  await openPlayground(page, { seedLayout: false });
   await waitForPythonReady(page);
   await waitForLinter(page);
+  await expect
+    .poll(() => page.evaluate(() => document.getElementById('app')?.dataset.layout))
+    .toBe('vertical');
+  await expect(page.locator('#diag-resizer')).toBeVisible();
 
   await runProgram(
     page,
@@ -349,6 +363,19 @@ const NON_TEXT_SAMPLES: Sample[] = [
     prop: 'outlineColor',
     focus: true,
   },
+  // spec-09 NFR-902: diagnostics separator resting fill (hover/focus sampled
+  // separately in VC-071 after the control is shown).
+  {
+    label: 'diag-resizer resting',
+    selector: '#diag-resizer',
+    prop: 'backgroundColor',
+  },
+  {
+    label: 'focus ring (diag-resizer)',
+    selector: '#diag-resizer',
+    prop: 'outlineColor',
+    focus: true,
+  },
   // spec-08 NFR-803: About control focus ring (dialog chrome sampled after open).
   {
     label: 'focus ring (about)',
@@ -465,11 +492,23 @@ for (const scheme of ['light', 'dark'] as const) {
         ])),
       );
 
+      // spec-09 NFR-902: hover fill on the diagnostics separator.
+      await page.locator('#diag-resizer').hover();
+      measured.push(
+        ...(await measureContrast(page, [
+          {
+            label: 'diag-resizer hover',
+            selector: '#diag-resizer',
+            prop: 'backgroundColor',
+          },
+        ])),
+      );
+
       // spec-08 VC-815: dialog border / backdrop / Close ring with modal open.
       await openAboutDialog(page);
       measured.push(...(await measureContrast(page, ABOUT_NON_TEXT_SAMPLES)));
 
-      expect(measured).toHaveLength(NON_TEXT_SAMPLES.length + 3 + ABOUT_NON_TEXT_SAMPLES.length);
+      expect(measured).toHaveLength(NON_TEXT_SAMPLES.length + 4 + ABOUT_NON_TEXT_SAMPLES.length);
       expect(failures(measured, 3)).toEqual([]);
     });
   });

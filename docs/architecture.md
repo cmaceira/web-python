@@ -10,6 +10,7 @@ the implementation deliberately differs from the spec's *Data & Interfaces*.
 │      └─ autosave → localStorage['pyplay.workspace.v1']               │
 │    color mode ── pyplay.theme.v1; editor darkTheme from effective   │
 │    layout ── pyplay.layout.v2; #app[data-layout] drives the grid    │
+│    diagnostics height ── pyplay.diagnostics-height.v1; #diag-resizer │
 │    console (rAF-batched, bounded)                                   │
 │    status bar, toolbar, stdin field, diagnostics panel              │
 │    Ruff-WASM (lint + format, in-thread)                             │
@@ -460,20 +461,24 @@ chosen one stays sticky (BR-405).
 
 ### Document order is fixed, and that is load-bearing
 
-Both layouts render the same DOM in the same order — console, editor, stdin,
-diagnostics — and the columns are produced by `grid-template-areas` placement
-only (FR-410, BR-402). Two separate things depend on this:
+Both layouts render the same four panels in the same document order — console,
+editor, stdin, diagnostics — and the columns are produced by
+`grid-template-areas` placement only (FR-410, BR-402). The diagnostics
+separator (`#diag-resizer`) is a non-panel sibling inserted immediately after
+the editor and before stdin; it is never a re-parent of any panel. Two separate
+things depend on the fixed panel order:
 
 - **CodeMirror.** Re-parenting the editor element forces a re-measure and drops
   focus and selection, which would break FR-419 outright. Because the element
   never moves, a switch costs one repaint and the `EditorView` is the same
   object afterwards — `VC-420` asserts object identity, not just equal state.
-- **WCAG SC 2.4.3.** A fixed document order means sequential focus order is
-  *identical* in both layouts, so switching cannot reorder the tab sequence.
-  That is only safe because **the console panel contains no focusable element**
-  (BR-407): focus visits the left column and then the right column top to
-  bottom, matching the visual reading order both ways. Any future change that
-  puts a tab stop inside the console has to re-verify SC 2.4.3 against this.
+- **WCAG SC 2.4.3.** Fixed panel order keeps reading order stable. When the
+  separator is active (two-column layout at ≥ 900 px) sequential focus visits
+  editor → separator → stdin → diagnostics; when it is inert it drops out of
+  the interactive path but stays in the DOM. That is only safe because **the
+  console panel contains no focusable element** (BR-407): focus still matches
+  visual order top to bottom. Any future change that puts a tab stop inside
+  the console has to re-verify SC 2.4.3 against this.
 
 The grid is shared with spec-03's pane, not competing with it. `.app` has two
 grid definitions, kept mutually exclusive by selector: spec-03's
@@ -483,17 +488,62 @@ inline-end column in *both* layouts. The `:not()` also matches when the
 attribute is absent, so a JavaScript failure leaves spec-03 rendering exactly
 as it shipped.
 
-### The diagnostics cap is a track, not a percentage
+### Diagnostics height in the two-column layout
 
-In the stacked layout the diagnostics panel keeps its `max-height: 25vh`. In
-the two-column layout's inline-end column FR-409 caps it at 40 % *of that
-column*, which no
-percentage can express: a percentage `max-height` on a grid item resolves
-against its own track, which is circular. So the cap is the track —
-`minmax(0, 0.66fr)` gives the row 0.66/1.66 = 39.8 % of the free space the
-console and diagnostics share, which is below 40 % of the whole right column
-at every viewport height, with the console holding FR-409's 80 px floor via
-`minmax(80px, 1fr)`.
+In the stacked (`horizontal`) layout the diagnostics panel keeps its
+`max-height: 25vh`. That behaviour is unchanged.
+
+In the two-column (`vertical`) layout at ≥ 900 px the Problems panel under
+Input starts at the same **content-sized empty height** as the stacked
+(`horizontal`) layout — Problems title, live count, and empty/body line, not a
+free-space fraction — so the console keeps the room. Visitors who need a taller
+list enlarge it; the chosen height is remembered on this origin. This is not a
+hide or collapse of either panel (issue #21); both stay in the layout.
+
+#### How the height is applied
+
+The right-column grid rows are: console `minmax(80px, 1fr)`, an 8 px separator
+track (`diagsep`), content-sized stdin, then diagnostics sized by the CSS
+custom property `--diagnostics-height` on `document.documentElement`. When that
+property is unset, the diagnostics track is `auto`: the empty state keeps its
+intrinsic line (matching horizontal) while the findings list stays
+flex-collapsed (`flex-basis: 0` with `min-height: 0`) so a content-derived
+default paints without waiting on JavaScript measurement and without an `fr`
+share.
+
+A render-blocking bootstrap in `index.html` reads
+`pyplay.diagnostics-height.v1` and, when the value is a canonical integer
+string, sets `--diagnostics-height` before first paint so a restored height
+does not flash a large free-space share.
+
+#### The separator
+
+`#diag-resizer` sits between the console and the stdin row visually
+(`grid-area: diagsep`) with `role="separator"`, `aria-orientation="horizontal"`,
+and accessible name `Resize diagnostics panel`. Pointer drag and `ArrowUp` /
+`ArrowDown` (with `Shift` for a larger step) reallocate free space between the
+console and diagnostics; stdin stays content-sized. Outside vertical layout at
+≥ 900 px the control is CSS-hidden and made inert with `setInert()` — never the
+HTML `disabled` attribute — so every activation path is a no-op.
+
+#### Bounds and persistence
+
+The minimum height is content-derived from the Problems title row, its margin,
+one empty/body line, and the diagnostics panel's padding — matching the stacked
+layout's natural empty height so font inflation cannot clip the count or the
+empty line. The maximum is the lesser of 40 % of the right column's height
+(console top to diagnostics bottom) and the height that still leaves the
+console its 80 px floor — whichever bound is hit first, expressed as an integer
+CSS-px height.
+
+Committed resizes (pointer release, or a keyboard step that changes height)
+write a canonical decimal integer string (no units, no leading zero) to
+`localStorage['pyplay.diagnostics-height.v1']`. A clamp caused only by
+viewport or layout change updates the in-memory height and `aria-valuenow` but
+does **not** rewrite storage until the visitor next commits a resize. Missing
+or non-canonical stored values are treated as absent (content-sized default) and
+left in place. A rejected write still applies the height for the session and
+shows `Diagnostics height won't be remembered` at most once per page load.
 
 ### The control
 
@@ -642,7 +692,7 @@ lives in `src/format.ts` with the rest of the chrome strings.
 
 ## Storage surface
 
-The origin holds exactly four things, and nothing else — no cookies, no
+The origin holds exactly five things, and nothing else — no cookies, no
 IndexedDB, no `sessionStorage`:
 
 | Store | Key | Contents |
@@ -650,6 +700,7 @@ IndexedDB, no `sessionStorage`:
 | `localStorage` | `pyplay.layout.v2` | exactly `horizontal` (stacked) or `vertical` (two columns) — a bare string from a two-value enum, no JSON, no wrapper, no whitespace |
 | `localStorage` | `pyplay.theme.v1` | exactly `light`, `dark`, or `system` — raw string, no JSON |
 | `localStorage` | `pyplay.workspace.v1` | versioned flat workspace: active filename plus Base64 file bytes, capped at 2 MB |
+| `localStorage` | `pyplay.diagnostics-height.v1` | canonical diagnostics panel height in CSS px: `^[1-9][0-9]*$` (e.g. `36`) — no JSON, no units, no whitespace |
 | Cache Storage | `pyplay-assets-v<build>` | the precached static assets; older buckets are deleted on activation |
 
 The workspace begins with the same friendly UTF-8 `main.py` used by the
@@ -679,6 +730,11 @@ read (see *What the two names mean* above). Anything that is not exactly one of
 the two literals is treated as absent and **left in place**, never rewritten
 (FR-417). A rejected write shows one notice per page load and still
 applies the layout for the session (FR-418, BR-406).
+
+`pyplay.diagnostics-height.v1` is written only on a committed resize (see
+*Diagnostics height in the two-column layout* above). Non-canonical values are
+treated as absent and left in place; a rejected write keeps the in-memory
+height and shows its own one-shot notice.
 
 ---
 

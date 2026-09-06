@@ -553,9 +553,10 @@ for (const viewport of [
     await openPlayground(page, { seedLayout: false });
     await waitForPythonReady(page);
     await waitForLinter(page);
-    // Give the diagnostics panel something to scroll to.
+    // Seed findings. Vertical defaults to a short content floor (spec-09), so entries
+    // stay in the document but may be clipped — assert attachment, not paint.
     await runProgram(page, 'import os\nx=1\n');
-    await expect(page.locator('#diagnostics-list .diagnostic-entry').first()).toBeVisible();
+    await expect(page.locator('#diagnostics-list .diagnostic-entry').first()).toBeAttached();
 
     expect(await renderedLayout(page)).toBe('vertical');
 
@@ -991,15 +992,19 @@ test.describe('the layout control', () => {
     await waitForPythonReady(page);
     await waitForLinter(page);
     await runProgram(page, 'import os\nx=1\n');
-    await expect(page.locator('#diagnostics-list .diagnostic-entry').first()).toBeVisible();
+    await expect(page.locator('#diagnostics-list .diagnostic-entry').first()).toBeAttached();
+    // Content-floor default may clip entries; enlarge so Tab can land on one.
+    const diagResizer = page.locator('#diag-resizer');
+    await diagResizer.focus();
+    for (let i = 0; i < 20; i++) await diagResizer.press('ArrowUp');
     expect(await renderedLayout(page)).toBe('vertical');
 
     /*
      * The real tab order, walked with `Tab` rather than inferred from a DOM
      * query — which is what BR-407 is about. Each stop is recorded as the
      * `aria-label` of the panel that contains it, so the sequence reads as the
-     * columns the visitor traverses. Stops outside the panels (the toolbar)
-     * are skipped.
+     * columns the visitor traverses. `#diag-resizer` is a non-panel stop
+     * between editor and stdin (spec-09 FR-913); it is recorded by id.
      */
     await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
     await page.locator('body').click({ position: { x: 2, y: 2 } });
@@ -1020,10 +1025,11 @@ test.describe('the layout control', () => {
               ? 'diagnostic-entry'
               : el.id,
           isEntry: el.classList.contains('diagnostic-entry'),
+          isDiagResizer: el.id === 'diag-resizer',
         };
       });
       if (!stop) break;
-      if (stop.panel) stops.push({ panel: stop.panel, target: stop.target });
+      if (stop.panel || stop.isDiagResizer) stops.push({ panel: stop.panel, target: stop.target });
       if (stop.isEntry) break;
     }
 
@@ -1034,15 +1040,18 @@ test.describe('the layout control', () => {
       'the console holds no focusable element',
     ).toEqual([]);
 
-    // The left column's stop precedes every right-column stop.
+    // The left column's stop precedes every right-column stop; the diagnostics
+    // resizer sits between editor and stdin in document order (FR-913).
     expect(stops.map((stop) => stop.target)).toEqual([
       'editor',
+      'diag-resizer',
       'stdin-input',
       'btn-eof',
       'diagnostic-entry',
     ]);
     expect(stops.map((stop) => stop.panel)).toEqual([
       'Editor',
+      '',
       'Standard input',
       'Standard input',
       'Diagnostics',
@@ -1245,7 +1254,7 @@ test.describe('the layout control below 900 px', () => {
    VC-407 (FR-049 from spec-01, FR-405): the toolbar's tab order.
    ------------------------------------------------------------------------- */
 
-test('VC-407 (FR-049 from spec-01, FR-405): Tab reaches every control once, identically in both layouts', async ({
+test('VC-407 (FR-049 from spec-01, FR-405): Tab reaches every control once in both layouts', async ({
   page,
 }) => {
   await page.setViewportSize(WIDE);
@@ -1254,7 +1263,7 @@ test('VC-407 (FR-049 from spec-01, FR-405): Tab reaches every control once, iden
   await waitForPythonReady(page);
   await waitForLinter(page);
   await runProgram(page, 'import os\nx=1\n');
-  await expect(page.locator('#diagnostics-list .diagnostic-entry').first()).toBeVisible();
+  await expect(page.locator('#diagnostics-list .diagnostic-entry').first()).toBeAttached();
 
   /**
    * Walk `Tab` forward from the top of the document, recording each stop and
@@ -1306,8 +1315,8 @@ test('VC-407 (FR-049 from spec-01, FR-405): Tab reaches every control once, iden
     return reached;
   };
 
-  /** Every stop FR-049 and FR-405 name, in the order `Tab` must reach them. */
-  const EXPECTED = [
+  /** Toolbar → editor → stdin → diagnostics. Horizontal hides `#diag-resizer`. */
+  const EXPECTED_HORIZONTAL = [
     'btn-run',
     'btn-stop',
     'btn-clear',
@@ -1333,17 +1342,30 @@ test('VC-407 (FR-049 from spec-01, FR-405): Tab reaches every control once, iden
     'diagnostic-entry',
   ];
 
+  /** Vertical ≥ 900 inserts `#diag-resizer` between editor and stdin (FR-913). */
+  const EXPECTED_VERTICAL = [
+    ...EXPECTED_HORIZONTAL.slice(0, EXPECTED_HORIZONTAL.indexOf('stdin-input')),
+    'diag-resizer',
+    ...EXPECTED_HORIZONTAL.slice(EXPECTED_HORIZONTAL.indexOf('stdin-input')),
+  ];
+
   expect(await renderedLayout(page)).toBe('horizontal');
-  const vertical = await enumerateTabOrder();
-  expect(vertical).toEqual(EXPECTED);
-  expect(vertical.filter((stop) => stop === 'layout-group')).toHaveLength(1);
+  // Stacked layout keeps a visible diagnostics body (`25vh`), so entries are
+  // reachable without enlarging.
+  const horizontal = await enumerateTabOrder();
+  expect(horizontal).toEqual(EXPECTED_HORIZONTAL);
+  expect(horizontal.filter((stop) => stop === 'layout-group')).toHaveLength(1);
 
   // Switch through the control itself, then enumerate again.
   await page.click(RADIOS.vertical);
   expect(await renderedLayout(page)).toBe('vertical');
-  const horizontal = await enumerateTabOrder();
+  // Content-floor default may clip entries; enlarge so Tab reaches one.
+  const diagResizer = page.locator('#diag-resizer');
+  await diagResizer.focus();
+  for (let i = 0; i < 20; i++) await diagResizer.press('ArrowUp');
+  const vertical = await enumerateTabOrder();
 
-  expect(horizontal, 'the enumeration is identical at both layouts').toEqual(vertical);
+  expect(vertical, 'vertical includes the diagnostics resizer').toEqual(EXPECTED_VERTICAL);
 });
 
 /* -------------------------------------------------------------------------

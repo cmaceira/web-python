@@ -61,12 +61,13 @@ failed, and the run's conclusion is the gate's own.
 ### The baselines the runner records for itself
 
 `e2e-chromium` and `audit-perf` run one step before their suite: they build the
-commits VC-408 and the app-size budgets are pinned to and record the reference
-measurements on the runner, into `RUNNER_TEMP`. The suite then reads them
-through `PYPLAY_BASELINE_GEOMETRY` and `PYPLAY_BASELINE_BUILD`. Both jobs check
-out with `fetch-depth: 0`, because a shallow clone has no baseline commit to
-build. Each pinned commit is read from the committed record it stands in for,
-so the workflow cannot drift from the spec that pins it.
+commits VC-408 and the live app-size budgets (NFR-904) are pinned to and record
+the reference measurements on the runner, into `RUNNER_TEMP`. The suite then
+reads them through `PYPLAY_BASELINE_GEOMETRY`, `PYPLAY_BASELINE_BUILD`, and
+`PYPLAY_BASELINE_DIAG_RESIZE`. Both jobs check out with `fetch-depth: 0`,
+because a shallow clone has no baseline commit to build. Each pinned commit is
+read from the committed record it stands in for, so the workflow cannot drift
+from the spec that pins it.
 
 The references have to come from the runner because both are properties of the
 environment as much as of the build: the panel column's height is a text metric

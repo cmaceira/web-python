@@ -28,6 +28,7 @@ import {
   RUNNING_LABEL,
   RUN_PYTHON_FILE_LABEL,
 } from './format';
+import { mountDiagResizer } from './diag-resize';
 import { CANNOT_FORMAT, formatDocument } from './lint/format-command';
 import { Linter } from './lint/linter';
 import { applyDiagnostics } from './lint/markers';
@@ -107,6 +108,8 @@ function boot(): void {
   let layoutPref = loadLayoutPreference(storage);
   // FR-418: at most one notice per page load.
   let layoutSaveWarned = false;
+  // Assigned after `renderLayout` is defined; sync is invoked from there (FR-903).
+  let diagResizer: ReturnType<typeof mountDiagResizer> | null = null;
 
   /**
    * Render the effective layout: the `data-layout` attribute, the control's
@@ -149,7 +152,24 @@ function boot(): void {
       layoutGroup.removeAttribute('title');
       layoutGroup.removeAttribute('aria-describedby');
     }
+
+    // FR-903 / FR-906 / FR-908: refresh separator inertness, aria bounds, and
+    // in-memory clamp whenever effective layout or the 900 px mask changes.
+    diagResizer?.sync();
   };
+
+  // FR-903 – FR-912: diagnostics ↔ console separator (vertical ≥ 900 only).
+  diagResizer = mountDiagResizer({
+    app,
+    resizer: need('diag-resizer'),
+    diagnostics: need('diagnostics-list').closest('.panel--diagnostics')!,
+    consolePanel: need('console').closest('.panel--console')!,
+    storage,
+    notices,
+    getEffectiveLayout: () =>
+      resolveLayout(layoutPref, wide.matches ? LAYOUT_MIN_WIDTH : 0),
+  });
+
 
   /**
    * FR-403 / FR-404 / FR-405: the visitor chose `layout`. Persist it, apply

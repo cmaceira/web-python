@@ -72,7 +72,15 @@ test('VC-608 (FR-606): arrows, pages, Enter, pointer, Escape, and Tab use standa
   expect(await editorText(page)).toBe('print');
   await expect(page.locator('.cm-content')).toBeFocused();
 
+  // Leave the editor for the next sequential stop. Vertical ≥ 900 inserts
+  // `#diag-resizer` between editor and stdin (FR-913); stacked / narrow skip it.
   await page.keyboard.press('Tab');
+  const layout = await page.locator('#app').getAttribute('data-layout');
+  const diagResizerVisible = await page.locator('#diag-resizer').isVisible();
+  if (layout === 'vertical' && diagResizerVisible) {
+    await expect(page.locator('#diag-resizer')).toBeFocused();
+    await page.keyboard.press('Tab');
+  }
   await expect(page.locator('#stdin-input')).toBeFocused();
 });
 
@@ -110,10 +118,9 @@ test('VC-611 (FR-608): acceptance is one undoable edit observed by autosave and 
 
   await page.keyboard.press('ControlOrMeta+z');
   expect(await editorText(page)).toBe('ret');
-  // historyKeymap: Mod-y on Win/Linux, Mod-Shift-z on macOS (see @codemirror/commands).
-  await page.keyboard.press(
-    process.platform === 'darwin' ? 'Meta+Shift+z' : 'ControlOrMeta+y',
-  );
+  // `Mod-y` is CodeMirror's redo on Windows/Linux only; `Mod-Shift-z` is
+  // bound on every platform (see layout-state.spec.ts).
+  await page.keyboard.press('ControlOrMeta+Shift+Z');
   expect(await editorText(page)).toBe('return');
 
   await expect.poll(() => storedProgram(page)).toBe('return');

@@ -48,7 +48,8 @@ The normative source is [CPython 3.13 `Lib/keyword.py`](https://github.com/pytho
 ## Known limits (still true at freeze)
 
 - 375×667: no horizontal overflow; list scrolls. Contrast: text ≥ 4.5:1; border/selected fill ≥ 3:1.
-- 500-line auto-complete: paint ≤ 200 ms; no main-thread task > 100 ms. Zero completion requests; cold load ≤ 15 MB; no new asset URL; ≤ 9 KB gzipped app delta vs `3efb8be` (measured 7.49 KiB).
+- 500-line auto-complete: paint ≤ 200 ms; no main-thread task > 100 ms. Zero completion requests; cold load ≤ 15 MB; no new asset URL.
+- **NFR-606 size (amended by spec-09)**: the **7.51 KiB ≤ 9 KB** ship measurement vs `3efb8be` is immutable; VC-623 no longer subtracts every future whole-app build from that baseline. It retains the live latency, long-task, and zero-request checks. Later features carry their own anchored budgets (NFR-805, NFR-904).
 - One `listbox` with `option` children and exactly one initially selected option.
 - Cross-file semantic completion needs a future analysis-worker spec. VC-624 (real LockDown Browser exam smoke on every student platform) remains institutional sign-off.
 

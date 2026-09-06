@@ -86,6 +86,12 @@ export const LAYOUT_NARROW_HINT = 'Vertical layout needs a window at least 900 p
 /** FR-418: the preference write was rejected. */
 export const LAYOUT_SAVE_FAILED = "Layout preference won't be remembered";
 
+/** FR-903: `#diag-resizer` accessible name. */
+export const DIAG_RESIZER_LABEL = 'Resize diagnostics panel';
+
+/** FR-912: the height preference write was rejected. */
+export const DIAG_HEIGHT_SAVE_FAILED = "Diagnostics height won't be remembered";
+
 /** Mode table labels (FR-504): tooltip and accessible-name suffix. */
 export const THEME_LABELS = {
   light: 'Light',

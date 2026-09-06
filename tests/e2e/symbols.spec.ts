@@ -892,7 +892,9 @@ test.describe('wide layout keyboard model', () => {
     await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
 
     const visited: string[] = [];
-    for (let i = 0; i < 20; i++) {
+    // About (+1) and optional `#diag-resizer` under vertical (≥900) need headroom.
+    const tabBudget = 21;
+    for (let i = 0; i < tabBudget; i++) {
       await page.keyboard.press('Tab');
       visited.push(
         await page.evaluate(() => {
@@ -915,7 +917,14 @@ test.describe('wide layout keyboard model', () => {
     // The files pane is open by default at this width (`FilePane`'s
     // `syncLayout`); its own DOM position (after Diagnostics, per FR-317 and
     // FR-410's fixed runs) puts its tab stops after the editor/stdin group.
-    expect(visited.slice(0, 20)).toEqual([
+    // Vertical ≥ 900 inserts `#diag-resizer` between editor and stdin (FR-913).
+    const layout = await page.locator('#app').getAttribute('data-layout');
+    const diagResizerVisible = await page.locator('#diag-resizer').isVisible();
+    const afterEditor =
+      layout === 'vertical' && diagResizerVisible
+        ? (['#diag-resizer', '#stdin-input', '#btn-eof'] as const)
+        : (['#stdin-input', '#btn-eof'] as const);
+    const expected = [
       '#btn-run',
       '#btn-stop',
       '#btn-clear',
@@ -931,14 +940,14 @@ test.describe('wide layout keyboard model', () => {
       '#btn-about',
       'pane',
       'editor',
-      '#stdin-input',
-      '#btn-eof',
+      ...afterEditor,
       '#btn-file-new',
       '#btn-file-rename',
       '#btn-file-delete',
       'file-tree',
       '#file-resizer',
-    ]);
+    ];
+    expect(visited.slice(0, expected.length)).toEqual(expected);
   });
 
   test('VC-314 (FR-309, FR-306): Enter and Space both copy the focused character', async ({

@@ -27,6 +27,25 @@
         document.documentElement.style.colorScheme = effective;
       })();
     </script>
+    <!-- FR-910: apply a canonical stored diagnostics height before CSS paint so
+         vertical layout never flashes the old fr share. Non-canonical / missing
+         → leave unset; CSS defaults the track to the content-sized empty
+         minimum (FR-901 / FR-911). Regex matches src/diag-resize.ts
+         isCanonicalDiagHeight. -->
+    <script>
+      (function () {
+        var KEY = 'pyplay.diagnostics-height.v1';
+        try {
+          var raw = localStorage.getItem(KEY);
+          if (raw && /^[1-9][0-9]*$/.test(raw)) {
+            document.documentElement.style.setProperty(
+              '--diagnostics-height',
+              raw + 'px',
+            );
+          }
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="app" class="app">
@@ -132,6 +151,22 @@
         <div id="editor" class="editor"></div>
       </section>
 
+      <!-- FR-913: non-panel sibling immediately after the editor, before stdin.
+           Visible only in vertical ≥ 900 px (CSS + hidden); mountDiagResizer
+           applies setInert for FR-906. aria-value* filled by the controller
+           after measure. Label matches DIAG_RESIZER_LABEL (FR-903). -->
+      <div
+        id="diag-resizer"
+        class="diag-resizer"
+        role="separator"
+        aria-orientation="horizontal"
+        aria-label="Resize diagnostics panel"
+        aria-valuemin="1"
+        aria-valuemax="1"
+        aria-valuenow="1"
+        tabindex="0"
+      ></div>
+
       <section class="panel panel--stdin" aria-label="Standard input">
         <label class="stdin-label" for="stdin-input">Input</label>
         <input
@@ -151,8 +186,11 @@
         <h2 class="panel-title">
           Problems <span id="diagnostics-count" class="count">0</span>
         </h2>
-        <ul id="diagnostics-list" class="diagnostics-list"></ul>
-        <p id="diagnostics-empty" class="diagnostics-empty">Linter unavailable.</p>
+        <!-- tabindex=-1: vertical layout sets overflow:auto on these for the
+             flex-collapsed body; Chromium would otherwise insert them into
+             sequential focus as scroll containers. Entry buttons stay tabbable. -->
+        <ul id="diagnostics-list" class="diagnostics-list" tabindex="-1"></ul>
+        <p id="diagnostics-empty" class="diagnostics-empty" tabindex="-1">Linter unavailable.</p>
       </section>
 
       <!-- FR-317 pins `#symbol-pane` immediately after `#notices` and before
