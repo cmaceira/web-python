@@ -21,6 +21,7 @@ import { python } from '@codemirror/lang-python';
 import { tags as t } from '@lezer/highlight';
 import { diagnosticMarkers } from './lint/markers';
 import { pythonNameCompletionSource } from './completion';
+import { sanitizePythonPaste, type PasteRange } from './paste';
 
 /**
  * Syntax highlighting mapped to stable class names so the palette lives in CSS
@@ -67,6 +68,8 @@ export interface EditorOptions {
   onFormat?: () => void;
   /** Effective palette from the theme module (BR-502 — no matchMedia here). */
   effectiveColorScheme: 'light' | 'dark';
+  /** Issue #28: paste cleanup is active only for the current lowercase `.py` file. */
+  shouldSanitizePaste?: () => boolean;
 }
 
 export function createEditor({
@@ -76,6 +79,7 @@ export function createEditor({
   onRun,
   onFormat,
   effectiveColorScheme,
+  shouldSanitizePaste,
 }: EditorOptions): EditorView {
   const extensions: Extension[] = [
     // Ahead of the default keymap, which binds `Mod-Enter` to insertBlankLine.
@@ -118,6 +122,24 @@ export function createEditor({
     indentUnit.of('    '),
     syntaxHighlighting(pyHighlight),
     python(),
+    // FR-1001 / FR-1003: keep CodeMirror's native paste transaction and add
+    // cleanup sequentially inside that same transaction. Undo therefore
+    // restores the exact pre-paste document, and every observer sees only the
+    // sanitized result.
+    EditorState.transactionFilter.of((transaction) => {
+      if (!transaction.isUserEvent('input.paste') || !shouldSanitizePaste?.()) {
+        return transaction;
+      }
+
+      const pastedRanges: PasteRange[] = [];
+      transaction.changes.iterChanges((_fromA, _toA, fromB, toB) => {
+        if (fromB < toB) pastedRanges.push({ from: fromB, to: toB });
+      });
+      const edits = sanitizePythonPaste(transaction.newDoc.toString(), pastedRanges);
+      return edits.length === 0
+        ? transaction
+        : [transaction, { changes: edits, sequential: true }];
+    }),
     // FR-601 – FR-607: name-only completion is local and independent of the
     // Python/Ruff workers. Tab is conditional above: it accepts an open
     // completion and remains ordinary page traversal at all other times.

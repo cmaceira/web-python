@@ -6,14 +6,16 @@ into the running program, copies the program to the clipboard, picks Python
 punctuation out of a special-character pane, forces light or dark chrome (or
 follows the system), and gets inline Ruff lint diagnostics plus one-click PEP 8
 formatting. The editor also completes local
-names, Python built-ins, and Python 3.13 keywords entirely in the browser.
+names, Python built-ins, and Python 3.13 keywords entirely in the browser. When
+Python code is pasted, it also removes invisible formatting characters and
+repairs common typographic lookalikes outside strings and comments.
 
 Everything runs in the visitor's own browser:
 
 | Concern | How |
 |---|---|
 | Python | [Pyodide](https://pyodide.org) 0.28.x — CPython 3.13 compiled to WebAssembly — inside a dedicated Web Worker, self-hosted from this site's own origin |
-| Editor | CodeMirror 6 with `@codemirror/lang-python` |
+| Editor | CodeMirror 6 with `@codemirror/lang-python`; syntax-aware cleanup of suspicious Unicode characters pasted into `.py` files |
 | Completion | Name-only CodeMirror completion from the current file, built-ins, and Python 3.13 hard/soft keywords; no language server or network request |
 | Lint + format | `@astral-sh/ruff-wasm-web` 0.14.x, self-hosted, default rule selection |
 | Blocking `input()` | A `SharedArrayBuffer` + `Atomics.wait` channel between the page and the worker |
@@ -35,6 +37,7 @@ limited to 2 MB for classroom exercises.
 - Layout control: [`specs/04-toogle-pane-aspect-frozen.md`](specs/04-toogle-pane-aspect-frozen.md)
 - Color mode: [`specs/05-dark-mode-frozen.md`](specs/05-dark-mode-frozen.md)
 - Offline name completion: [`specs/06-offline-completion.md`](specs/06-offline-completion.md)
+- Python paste sanitisation: [`specs/10-paste-sanitisation-frozen.md`](specs/10-paste-sanitisation-frozen.md)
 - Deploying it: [`docs/deployment.md`](docs/deployment.md)
 - How it works inside: [`docs/architecture.md`](docs/architecture.md)
 - Working on it: [`CONTRIBUTING.md`](CONTRIBUTING.md)

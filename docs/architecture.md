@@ -6,7 +6,7 @@ the implementation deliberately differs from the spec's *Data & Interfaces*.
 ```
 ┌──────────────────────────── main thread ────────────────────────────┐
 │  index.html + src/main.ts                                           │
-│    flat file tree + CodeMirror + local name completion                │
+│    flat file tree + CodeMirror + completion + Python paste cleanup    │
 │      └─ autosave → localStorage['pyplay.workspace.v1']               │
 │    color mode ── pyplay.theme.v1; editor darkTheme from effective   │
 │    layout ── pyplay.layout.v2; #app[data-layout] drives the grid    │
@@ -29,6 +29,17 @@ the implementation deliberately differs from the spec's *Data & Interfaces*.
 The visitor's program **never** runs on the main thread. That is what makes
 Stop unconditional: a runaway `while True: pass` can be killed with
 `worker.terminate()` because it was never holding the UI.
+
+Python paste cleanup is also main-thread-only and synchronous. A CodeMirror
+transaction filter inspects only native `input.paste` transactions for the
+active lowercase `.py` file. It parses the post-paste document twice: first to
+repair smart quote delimiters outside existing strings/comments, then to map
+Unicode spaces, formatting characters, line separators, and lookalike dashes
+only in code. F-string literal text is protected while replacement expressions
+remain code. The cleanup changes are composed sequentially into the original
+paste transaction, so autosave and lint see only the final text and one Undo
+removes the entire paste. No notice, storage key, worker message, clipboard
+write, Ruff call, or network request is involved.
 
 ---
 
