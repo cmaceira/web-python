@@ -283,6 +283,8 @@ function boot(): void {
     },
     onRun: () => startRun(), // FR-008
     onFormat: () => runFormat(), // FR-009
+    // FR-1001 / BR-1001: prose and data files keep exact clipboard contents.
+    shouldSanitizePaste: () => workspace.activeFile?.endsWith('.py') ?? false,
   });
 
   // FR-050: flush any pending write synchronously when the page goes away.
