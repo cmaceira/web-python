@@ -2,15 +2,11 @@
  * spec-09 — minimal diagnostics under input (vertical layout).
  *
  * VC-901 – VC-911, VC-913: behaviour against the built site.
- * VC-912 (NFR-901, NFR-903, NFR-904): hit target, apply-height latency, and
- * app-payload gzipped delta vs merge-base `562cb27`. Contrast (NFR-902) lives
- * in `presentation.spec.ts` (VC-071); geometry regress (NFR-905) stays on
- * VC-409 / VC-435 in `layout.spec.ts`.
+ * VC-912 (NFR-901, NFR-903): hit target and apply-height latency. NFR-904's
+ * shipped size measurement is historical as of spec-10. Contrast (NFR-902)
+ * lives in `presentation.spec.ts` (VC-071); geometry regress (NFR-905) stays
+ * on VC-409 / VC-435 in `layout.spec.ts`.
  */
-import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { gzipSync } from 'node:zlib';
 import { expect, test, type Page, type Request } from '@playwright/test';
 import {
   DIAG_CONSOLE_MIN,
@@ -581,47 +577,9 @@ test('VC-913 (end-to-end): enlarge, persist, layout and viewport round-trip', as
 });
 
 /* -------------------------------------------------------------------------
-   VC-912 — NFR-901 / NFR-903 / NFR-904 (contrast → VC-071; geometry → VC-409/435)
+   VC-912 — NFR-901 / NFR-903 (contrast → VC-071; geometry → VC-409/435)
    ------------------------------------------------------------------------- */
-
-const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
-const dist = join(repoRoot, 'dist');
-
-interface BaselineBuild {
-  commit: string;
-  gzippedApp?: number;
-  gzippedBy?: string;
-  gzippedAppBy?: Record<string, number>;
-}
-
-/** Merge-base before this feature branch — NFR-904. */
-const DIAG_BASELINE_PATH =
-  process.env.PYPLAY_BASELINE_DIAG_RESIZE ??
-  join(repoRoot, 'tests', 'e2e', 'baseline-build-diag-resize.json');
-
-const diagBaseline = JSON.parse(readFileSync(DIAG_BASELINE_PATH, 'utf8')) as BaselineBuild;
-const compressor = `${process.platform}-${process.arch} zlib ${process.versions.zlib}`;
-const baselineApp =
-  diagBaseline.gzippedAppBy?.[compressor] ??
-  (diagBaseline.gzippedBy === compressor ? diagBaseline.gzippedApp : undefined);
-
-if (process.env.PYPLAY_BASELINE_DIAG_RESIZE !== undefined && baselineApp === undefined) {
-  throw new Error(
-    `${DIAG_BASELINE_PATH} records no app size for "${compressor}" (gzipped by ` +
-      `"${diagBaseline.gzippedBy}")`,
-  );
-}
-
-const uncoveredDiagCompressor =
-  `no ${diagBaseline.commit} baseline for "${compressor}" — have: ` +
-  `${Object.keys(diagBaseline.gzippedAppBy ?? {}).join(', ')}. Record with: ` +
-  `node scripts/record-baselines.mjs ${diagBaseline.commit} --build <out.json>`;
-
-const DIAG_SIZE_BUDGET_BYTES = 2 * 1024;
-const isVendored = (url: string): boolean =>
-  url.startsWith('/pyodide/') || url.startsWith('/ruff/');
-
-test('VC-912 (NFR-901, NFR-903, NFR-904): hit target, apply-height ≤ 50 ms, ≤ 2 KB gzipped', async ({
+test('VC-912 (NFR-901, NFR-903): hit target and apply-height ≤ 50 ms', async ({
   page,
 }) => {
   test.setTimeout(120_000);
@@ -671,33 +629,13 @@ test('VC-912 (NFR-901, NFR-903, NFR-904): hit target, apply-height ≤ 50 ms, �
   expect(applyMs, 'NFR-903 paint after apply-height').toBeLessThanOrEqual(50);
   expect(Math.max(0, ...longTasks), 'NFR-903 longest task').toBeLessThanOrEqual(50);
 
-  // NFR-904: gzipped app delta vs merge-base 562cb27 ≤ 2 KB.
-  test.skip(baselineApp === undefined, uncoveredDiagCompressor);
-
-  const manifest = JSON.parse(readFileSync(join(dist, 'precache-manifest.json'), 'utf8')) as {
-    urls: string[];
-  };
-  let gzippedApp = 0;
-  for (const url of [...manifest.urls, '/index.html']) {
-    if (url === '/') continue;
-    if (isVendored(url)) continue;
-    gzippedApp += gzipSync(readFileSync(join(dist, url.replace(/^\//, ''))), { level: 9 }).length;
-  }
-
-  const delta = gzippedApp - baselineApp!;
-  expect(
-    delta,
-    `NFR-904 app size delta vs ${diagBaseline.commit}: ${delta} B gzipped ` +
-      `(budget ${DIAG_SIZE_BUDGET_BYTES} B, compressor "${compressor}")`,
-  ).toBeLessThanOrEqual(DIAG_SIZE_BUDGET_BYTES);
-
   console.log(
     [
       'VC-912 measurements:',
       `  NFR-901 hit height                    ${hit.toFixed(0)} px   (>= 8)`,
       `  NFR-903 apply-height -> paint          ${applyMs.toFixed(0)} ms   (<= 50)`,
       `  NFR-903 longest task                   ${Math.max(0, ...longTasks).toFixed(0)} ms   (<= 50)`,
-      `  NFR-904 app delta vs ${diagBaseline.commit} ${(delta / 1024).toFixed(2)} KiB (<= 2.00)`,
+      '  NFR-904 app size delta                 (historical — see specs/09-minimal-diags-frozen.md)',
     ].join('\n'),
   );
 });

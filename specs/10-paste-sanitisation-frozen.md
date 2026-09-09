@@ -72,6 +72,21 @@ No broad Unicode normalization such as NFC/NFKC is applied.
 The feature adds no DOM node, user-visible string, preference, storage key,
 worker message, or clipboard write.
 
+## Non-Functional Requirements
+
+**NFR-1001 — Bounded application payload**
+Against branch point `2eb0bd4` (`v0.6.0`), paste sanitisation adds at most
+1 KiB to the gzip-compressed first-party application payload and adds no
+precache URL. The measurement excludes the byte-pinned Pyodide and Ruff vendor
+assets and is recorded with the same runner-local compressor as the candidate
+build.
+
+This spec amends NFR-904: its 2 KiB measurement remains the immutable ship
+measurement for spec-09, but VC-912 no longer charges every later whole-app
+feature to the diagnostics branch point. Its hit-target and latency assertions
+remain live. Paste sanitisation carries the independently anchored NFR-1001
+budget instead.
+
 ## Interfaces
 
 - `sanitizePythonPaste(document, pastedRanges)` is a deterministic helper that
@@ -95,6 +110,7 @@ worker message, or clipboard write.
 | **VC-1008** | BR-1001 | Disabled gating and non-paste edits remain byte-exact. |
 | **VC-1009** | FR-1001, FR-1003, FR-1004 | A real contaminated clipboard paste is cleaned, silent, persisted, undoable, and executable. |
 | **VC-1010** | BR-1001 | The same real paste into a `.txt` file remains byte-exact. |
+| **VC-1011** | NFR-1001 | The runner-local build is at most 1 KiB gzip above `2eb0bd4` and keeps the precache URL count unchanged. |
 
 ## Deliberately Excluded
 
