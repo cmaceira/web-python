@@ -743,6 +743,9 @@ test('VC-052 (FR-049): Tab reaches every target, each with a visible ring', asyn
     const { id, ring } = await focused();
     if (id) sequence.push(id);
     if (id && !seen.has(id)) seen.set(id, ring);
+    // Issue #31: Tab indents in CodeMirror. Its standard Ctrl+M focus mode
+    // lets this whole-page accessibility traversal continue after the editor.
+    if (id === '.cm-content') await page.keyboard.press('Control+m');
   }
 
   // FR-049's targets, in the order the document presents them, as amended by

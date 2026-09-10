@@ -6,7 +6,7 @@ the implementation deliberately differs from the spec's *Data & Interfaces*.
 ```
 ┌──────────────────────────── main thread ────────────────────────────┐
 │  index.html + src/main.ts                                           │
-│    flat file tree + CodeMirror + completion + Python paste cleanup    │
+│    flat file tree + CodeMirror + completion + Tab indentation + paste │
 │      └─ autosave → localStorage['pyplay.workspace.v1']               │
 │    color mode ── pyplay.theme.v1; editor darkTheme from effective   │
 │    layout ── pyplay.layout.v2; #app[data-layout] drives the grid    │
@@ -40,6 +40,20 @@ remain code. The cleanup changes are composed sequentially into the original
 paste transaction, so autosave and lint see only the final text and one Undo
 removes the entire paste. No notice, storage key, worker message, clipboard
 write, Ruff call, or network request is involved.
+
+CodeMirror's `indentUnit` is four ASCII spaces. Its native `indentWithTab`
+binding runs below completion acceptance, so `Tab` first accepts an open
+completion and otherwise indents the current or selected lines; `Shift+Tab`
+dedents one level. The default keymap's `Ctrl+M` (`Shift+Alt+M` on macOS)
+toggles Tab-focus mode, allowing browser focus navigation to leave the editor
+without a custom keyboard handler.
+
+The indentation highlighter paints a faint background dot for each leading
+space without replacing source characters; spaces inside code and strings are
+left alone. The editor panel and CodeMirror scroller cap their inline size,
+while the vertical Files/Editor/Console tracks use `minmax(0, …)` so
+indentation stays inside the editor's own scrolling area instead of
+redistributing the page columns.
 
 ---
 
@@ -298,11 +312,10 @@ conditionally-inert control ever uses the `disabled` attribute. Instead:
 transition. `aria-disabled` is also what Playwright's `toBeDisabled()` and
 `toBeEnabled()` report, so the inertness criteria read unchanged in the tests.
 
-Related: `Tab` is **not** bound to indentation in the editor. CodeMirror's
-`indentWithTab` would trap the tab sequence inside the editor and make the
-stdin field, Send EOF and the diagnostics entries unreachable. Indentation
-comes from `indentOnInput`, `indentUnit` and the default keymap's
-newline-and-indent instead.
+Related: `Tab` indents in the editor (issue #31). CodeMirror's built-in
+Tab-focus mode preserves keyboard access to the stdin field, Send EOF and the
+diagnostics entries: press `Ctrl+M` (`Shift+Alt+M` on macOS), then use Tab or
+Shift+Tab for browser focus traversal.
 
 ---
 

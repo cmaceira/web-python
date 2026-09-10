@@ -315,6 +315,9 @@ body {
   flex: 2 1 45%;
   display: flex;
   flex-direction: column;
+  /* Indentation may increase a line's intrinsic width. Keep that width inside
+     the editor scroller instead of allowing a flex/grid item to grow. */
+  min-width: 0;
 }
 
 /* Flat classroom workspace ------------------------------------------------ */
@@ -465,6 +468,7 @@ body {
 .editor {
   flex: 1;
   min-height: 120px;
+  min-width: 0;
   overflow: auto;
 }
 
@@ -486,10 +490,31 @@ body {
 
 .cm-editor {
   height: 100%;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .cm-editor .cm-content {
   font-family: var(--font-mono);
+}
+
+/* Issue #31: only leading indentation receives a background marker. It does
+   not replace the character, so indentation keeps its normal width and
+   selection/clipboard contents stay byte-exact. */
+.cm-editor .cm-highlightIndent {
+  background:
+    radial-gradient(
+      circle at 50% 55%,
+      color-mix(in srgb, var(--fg-muted) 32%, transparent) 14%,
+      transparent 30%
+    ) no-repeat;
+  background-position: 50% center;
+  background-size: 0.4em;
+}
+
+.cm-editor .cm-scroller {
+  max-width: 100%;
+  min-width: 0;
 }
 
 /* Name completion (spec-06) ---------------------------------------------- */
@@ -1127,7 +1152,9 @@ body {
    * 58 % split exact against the space `fr` tracks divide — the remainder
    * after the fixed-width files (and, combined below, symbols) columns are
    * subtracted — rather than against the whole grid, which a literal `58%`
-   * would resolve against and so shrink under a wide files pane.
+   * would resolve against and so shrink under a wide files pane. `minmax(0,
+   * …)` prevents a long or deeply indented editor line from becoming a grid
+   * track minimum and redistributing the Files, Editor, and Console columns.
    */
   #app[data-layout='vertical']:has(#file-pane:not([hidden])) {
     grid-template-areas:
@@ -1139,7 +1166,7 @@ body {
       "files   editor  diagsep"
       "files   editor  stdin"
       "files   editor  diag";
-    grid-template-columns: minmax(160px, var(--files-width)) 58fr 42fr;
+    grid-template-columns: minmax(160px, var(--files-width)) minmax(0, 58fr) minmax(0, 42fr);
   }
 
   #app[data-layout='vertical']:has(#file-pane:not([hidden])):has(#symbol-pane:not([hidden])) {
@@ -1152,7 +1179,7 @@ body {
       "files   editor  diagsep symbols"
       "files   editor  stdin   symbols"
       "files   editor  diag    symbols";
-    grid-template-columns: minmax(160px, var(--files-width)) 58fr 42fr 72px;
+    grid-template-columns: minmax(160px, var(--files-width)) minmax(0, 58fr) minmax(0, 42fr) 72px;
   }
 
   /*

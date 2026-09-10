@@ -896,8 +896,7 @@ test.describe('wide layout keyboard model', () => {
     const tabBudget = 21;
     for (let i = 0; i < tabBudget; i++) {
       await page.keyboard.press('Tab');
-      visited.push(
-        await page.evaluate(() => {
+      const target = await page.evaluate(() => {
           const el = document.activeElement as HTMLElement | null;
           if (!el || el === document.body) return '';
           if (el.classList.contains('symbol')) return 'pane';
@@ -907,8 +906,10 @@ test.describe('wide layout keyboard model', () => {
           // of its two radios currently holds the roving `tabindex="0"`.
           if (el.closest('#layout-group')) return 'layout';
           return el.id ? `#${el.id}` : el.tagName.toLowerCase();
-        }),
-      );
+        });
+      visited.push(target);
+      // Issue #31: use CodeMirror's keyboard escape after reaching the editor.
+      if (target === 'editor') await page.keyboard.press('Control+m');
     }
 
     expect(visited.filter((id) => id === 'pane')).toHaveLength(1);

@@ -1,5 +1,12 @@
 import { expect, test } from '@playwright/test';
-import { STARTER_PROGRAM, editorText, openPlayground, storedProgram, typeProgram } from './helpers';
+import {
+  STARTER_PROGRAM,
+  editorText,
+  openPlayground,
+  setProgram,
+  storedProgram,
+  typeProgram,
+} from './helpers';
 
 test('cross-origin isolation headers are served (BR-002)', async ({ page }) => {
   const response = await page.goto('/');
@@ -75,6 +82,102 @@ test('VC-004 (FR-004, BR-010): a clean origin loads the starter program', async 
   expect(text).toBe(STARTER_PROGRAM);
   expect(text).toContain('input(');
   expect(text).toContain('print(');
+});
+
+test('VC-1101 (FR-1101): Tab and Shift+Tab indent Python with four spaces only', async ({
+  page,
+}) => {
+  await openPlayground(page);
+  await setProgram(page, 'print("one")');
+  await page.locator('.cm-content').focus();
+  await page.keyboard.press('Home');
+  await page.keyboard.press('Tab');
+
+  expect(await editorText(page)).toBe('    print("one")');
+  expect(await editorText(page)).not.toContain('\t');
+
+  await page.keyboard.press('Shift+Tab');
+  expect(await editorText(page)).toBe('print("one")');
+});
+
+test('VC-1102 (FR-1102): selected lines indent together and preserve undo and redo', async ({
+  page,
+}) => {
+  await openPlayground(page);
+  const source = 'first = 1\nsecond = 2';
+  const indented = '    first = 1\n    second = 2';
+  await setProgram(page, source);
+  await page.locator('.cm-content').focus();
+  await page.keyboard.press('ControlOrMeta+a');
+  await page.keyboard.press('Tab');
+  expect(await editorText(page)).toBe(indented);
+  expect(await editorText(page)).not.toContain('\t');
+
+  await page.keyboard.press('ControlOrMeta+z');
+  expect(await editorText(page)).toBe(source);
+  await page.keyboard.press('ControlOrMeta+Shift+Z');
+  expect(await editorText(page)).toBe(indented);
+
+  await page.keyboard.press('ControlOrMeta+a');
+  await page.keyboard.press('Shift+Tab');
+  expect(await editorText(page)).toBe(source);
+});
+
+test('VC-1104 (FR-1104): whitespace dots and repeated indentation preserve grid geometry', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem('pyplay.layout.v2', 'vertical');
+  });
+  await openPlayground(page, { seedLayout: false });
+  await page.evaluate(() => {
+    document.documentElement.style.setProperty('--files-width', '480px');
+  });
+
+  const source = 'print("inner spaces")';
+  await setProgram(page, source);
+  await page.locator('.cm-content').focus();
+
+  const before = await page.evaluate(() => {
+    const bounds = (selector: string) => {
+      const { x, width } = document.querySelector(selector)!.getBoundingClientRect();
+      return { x, width };
+    };
+    const scroller = document.querySelector('.cm-scroller')!;
+    return {
+      files: bounds('.panel--files'),
+      editor: bounds('.panel--editor'),
+      console: bounds('.panel--console'),
+      pageWidth: document.documentElement.scrollWidth,
+      viewportWidth: document.documentElement.clientWidth,
+      scrollerWidth: scroller.clientWidth,
+    };
+  });
+
+  await expect(page.locator('.cm-highlightIndent')).toHaveCount(0);
+  expect(await editorText(page)).toBe(source);
+  await page.keyboard.press('Home');
+  for (let index = 0; index < 6; index += 1) await page.keyboard.press('Tab');
+
+  const after = await page.evaluate(() => {
+    const bounds = (selector: string) => {
+      const { x, width } = document.querySelector(selector)!.getBoundingClientRect();
+      return { x, width };
+    };
+    const scroller = document.querySelector('.cm-scroller')!;
+    return {
+      files: bounds('.panel--files'),
+      editor: bounds('.panel--editor'),
+      console: bounds('.panel--console'),
+      pageWidth: document.documentElement.scrollWidth,
+      viewportWidth: document.documentElement.clientWidth,
+      scrollerWidth: scroller.clientWidth,
+    };
+  });
+
+  expect(after).toEqual(before);
+  expect(await editorText(page)).toBe(`${' '.repeat(24)}${source}`);
+  await expect(page.locator('.cm-highlightIndent')).toHaveCount(24);
 });
 
 test('VC-010 (FR-010): Reset replaces the buffer on confirm and leaves it on cancel', async ({

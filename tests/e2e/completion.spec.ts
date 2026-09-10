@@ -44,7 +44,7 @@ test('VC-607 (FR-601, FR-602, FR-605): automatic and explicit name completion', 
   await expect(options(page).first()).toHaveAttribute('aria-selected', 'true');
 });
 
-test('VC-608 (FR-606): arrows, pages, Enter, pointer, Escape, and Tab use standard UI behavior', async ({
+test('VC-608 / VC-1103 (FR-606, FR-1103): completion Tab and Tab-focus mode use standard UI behavior', async ({
   page,
 }) => {
   await openPlayground(page);
@@ -72,8 +72,10 @@ test('VC-608 (FR-606): arrows, pages, Enter, pointer, Escape, and Tab use standa
   expect(await editorText(page)).toBe('print');
   await expect(page.locator('.cm-content')).toBeFocused();
 
-  // Leave the editor for the next sequential stop. Vertical ≥ 900 inserts
-  // `#diag-resizer` between editor and stdin (FR-913); stacked / narrow skip it.
+  // Issue #31: Tab now indents. CodeMirror's built-in focus mode leaves the
+  // editor for sequential navigation. Vertical ≥ 900 inserts `#diag-resizer`
+  // between editor and stdin (FR-913); stacked / narrow skip it.
+  await page.keyboard.press('Control+m');
   await page.keyboard.press('Tab');
   const layout = await page.locator('#app').getAttribute('data-layout');
   const diagResizerVisible = await page.locator('#diag-resizer').isVisible();

@@ -1031,6 +1031,9 @@ test.describe('the layout control', () => {
       if (!stop) break;
       if (stop.panel || stop.isDiagResizer) stops.push({ panel: stop.panel, target: stop.target });
       if (stop.isEntry) break;
+      // Issue #31: CodeMirror captures Tab for indentation until Ctrl+M turns
+      // on its standard Tab-focus mode.
+      if (stop.target === 'editor') await page.keyboard.press('Control+m');
     }
 
     // BR-407: no tab stop inside the console panel at all — which is what
@@ -1311,6 +1314,15 @@ test('VC-407 (FR-049 from spec-01, FR-405): Tab reaches every control once in bo
               : stop.id || stop.className,
       );
       if (stop.isEntry) break;
+      // Issue #31: continue the document traversal after CodeMirror's Tab
+      // indentation binding with its standard keyboard focus mode.
+      if (stop.isEditor) await page.keyboard.press('Control+m');
+    }
+    // Ctrl+M toggles a persistent mode, so return it to the default before
+    // this test repeats the traversal for the other layout.
+    if (reached.includes('editor')) {
+      await page.locator('.cm-content').focus();
+      await page.keyboard.press('Control+m');
     }
     return reached;
   };

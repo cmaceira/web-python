@@ -1,14 +1,17 @@
 import { Compartment, EditorState, Prec, type Extension } from '@codemirror/state';
 import {
+  Decoration,
   EditorView,
+  ViewPlugin,
   drawSelection,
   highlightActiveLine,
   highlightActiveLineGutter,
   highlightSpecialChars,
   keymap,
   lineNumbers,
+  type DecorationSet,
 } from '@codemirror/view';
-import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
+import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands';
 import { acceptCompletion, autocompletion } from '@codemirror/autocomplete';
 import {
   HighlightStyle,
@@ -58,6 +61,44 @@ function editabilityExtensions(readOnly: boolean): Extension[] {
   return [EditorState.readOnly.of(readOnly), EditorView.editable.of(!readOnly)];
 }
 
+const indentationSpace = Decoration.mark({ class: 'cm-highlightIndent' });
+
+function indentationDecorations(view: EditorView): DecorationSet {
+  const ranges = [];
+  for (const { from, to } of view.visibleRanges) {
+    let line = view.state.doc.lineAt(from);
+    while (line.from <= to) {
+      const indentation = /^[ \t]+/.exec(line.text)?.[0];
+      if (indentation) {
+        for (let offset = 0; offset < indentation.length; offset += 1) {
+          ranges.push(indentationSpace.range(line.from + offset, line.from + offset + 1));
+        }
+      }
+      if (line.to >= to) break;
+      line = view.state.doc.line(line.number + 1);
+    }
+  }
+  return Decoration.set(ranges, true);
+}
+
+/** Issue #31: show only indentation, never ordinary spaces inside Python code. */
+const highlightIndentation = ViewPlugin.fromClass(
+  class {
+    decorations: DecorationSet;
+
+    constructor(view: EditorView) {
+      this.decorations = indentationDecorations(view);
+    }
+
+    update(update: { docChanged: boolean; viewportChanged: boolean; view: EditorView }): void {
+      if (update.docChanged || update.viewportChanged) {
+        this.decorations = indentationDecorations(update.view);
+      }
+    }
+  },
+  { decorations: (plugin) => plugin.decorations },
+);
+
 export interface EditorOptions {
   parent: HTMLElement;
   initialDoc: string;
@@ -87,7 +128,7 @@ export function createEditor({
       keymap.of([
         {
           // FR-606: accept only while CodeMirror has an active completion.
-          // Returning false otherwise preserves native page traversal.
+          // Returning false lets the lower-priority indentation binding run.
           key: 'Tab',
           run: acceptCompletion,
         },
@@ -115,6 +156,7 @@ export function createEditor({
     highlightActiveLineGutter(),
     highlightActiveLine(),
     highlightSpecialChars(),
+    highlightIndentation,
     drawSelection(),
     history(),
     indentOnInput(),
@@ -141,8 +183,8 @@ export function createEditor({
         : [transaction, { changes: edits, sequential: true }];
     }),
     // FR-601 – FR-607: name-only completion is local and independent of the
-    // Python/Ruff workers. Tab is conditional above: it accepts an open
-    // completion and remains ordinary page traversal at all other times.
+    // Python/Ruff workers. Tab accepts an open completion before the
+    // lower-priority indentation binding handles it.
     autocompletion({
       activateOnTyping: true,
       activateOnTypingDelay: 100,
@@ -152,11 +194,10 @@ export function createEditor({
     }),
     // FR-036 / FR-037: diagnostic underlines, gutter icons and tooltips.
     diagnosticMarkers(),
-    // FR-049: `Tab` is never bound to indentation. With no completion open it
-    // walks past the editor to stdin, Send EOF and diagnostics. Indentation
-    // still comes from `indentOnInput`, `indentUnit` and the default keymap's
-    // `insertNewlineAndIndent`.
-    keymap.of([...defaultKeymap, ...historyKeymap]),
+    // Issue #31: CodeMirror's native binding indents and dedents whole lines
+    // with `indentUnit`, which is four ASCII spaces above. The default keymap
+    // keeps Ctrl+M (Shift+Alt+M on macOS) as the accessible Tab-focus escape.
+    keymap.of([indentWithTab, ...defaultKeymap, ...historyKeymap]),
     EditorView.lineWrapping,
     EditorView.updateListener.of((update) => {
       if (update.docChanged) onChange(update.state.doc.toString());

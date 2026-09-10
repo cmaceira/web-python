@@ -38,6 +38,7 @@ limited to 2 MB for classroom exercises.
 - Color mode: [`specs/05-dark-mode-frozen.md`](specs/05-dark-mode-frozen.md)
 - Offline name completion: [`specs/06-offline-completion.md`](specs/06-offline-completion.md)
 - Python paste sanitisation: [`specs/10-paste-sanitisation-frozen.md`](specs/10-paste-sanitisation-frozen.md)
+- Python Tab indentation: [`specs/11-tab-indentation-frozen.md`](specs/11-tab-indentation-frozen.md)
 - Deploying it: [`docs/deployment.md`](docs/deployment.md)
 - How it works inside: [`docs/architecture.md`](docs/architecture.md)
 - Working on it: [`CONTRIBUTING.md`](CONTRIBUTING.md)
@@ -191,17 +192,23 @@ repository settings that live outside this repository:
 | `↑` / `↓`, `Page Up` / `Page Down` | Navigate an open completion list |
 | `Enter` or click/tap | Accept the selected completion |
 | `Tab` with completion open | Accept the selected completion |
+| `Tab` in the editor | Indent the current or selected lines by four spaces |
+| `Shift` + `Tab` in the editor | Remove one four-space indentation level |
+| `Ctrl` + `M` (`Shift` + `Alt` + `M` on macOS) | Toggle CodeMirror's Tab-focus mode, then use Tab/Shift+Tab to leave the editor |
 | `Escape` | Dismiss completion |
 | `Shift` + `Alt` + `F` | Format (from the editor) |
 | `Enter` in the input field | Submit a line to the running program |
 | `Ctrl` + `D` in the input field | Send EOF |
-| `Tab` | Move to the next control — including Run, Stop, Clear console, Copy code, Format, Reset, the layout control, Symbols, the editor, the input field, Send EOF and the diagnostics entries |
+| `Tab` outside the editor | Move to the next control — including Run, Stop, Clear console, Copy code, Format, Reset, the layout control, Symbols, the editor, the input field, Send EOF and the diagnostics entries |
 | `←` `→` `↑` `↓` in the layout control | Select the other layout — and apply it |
 | `Home` / `End` in the layout control | Select `Horizontal` / `Vertical` |
 
-`Tab` is deliberately **not** bound to indentation inside the editor. It
-accepts a selected completion while the list is open; otherwise it leaves the
-editor and continues normal keyboard traversal of the page.
+`Tab` accepts a selected completion while the list is open. Otherwise it
+indents with four ASCII spaces, including every selected line; `Shift` + `Tab`
+dedents by one level. No literal tab character is introduced by editor
+indentation. Use CodeMirror's Tab-focus mode when keyboard navigation needs to
+leave the editor. Leading indentation spaces appear as faint dots inside the
+editor.
 
 The **layout control** picks how the panels are divided, and both names
 describe **the divider**, the way `vim`'s `:split` and `:vsplit` do:
