@@ -61,10 +61,10 @@ failed, and the run's conclusion is the gate's own.
 ### The baselines the runner records for itself
 
 `e2e-chromium` and `audit-perf` run one step before their suite: they build the
-commits VC-408 and the live app-size budgets (NFR-805 and NFR-1001) are pinned
+commits VC-408 and the live app-size budgets (NFR-805 and NFR-1201) are pinned
 to and record the reference measurements on the runner, into `RUNNER_TEMP`.
 The suite then reads them through `PYPLAY_BASELINE_GEOMETRY`,
-`PYPLAY_BASELINE_BUILD`, and `PYPLAY_BASELINE_PASTE`. Both jobs check out with
+`PYPLAY_BASELINE_BUILD`, and `PYPLAY_BASELINE_BRACKETS`. Both jobs check out with
 `fetch-depth: 0`,
 because a shallow clone has no baseline commit to build. Each pinned commit is
 read from the committed record it stands in for, so the workflow cannot drift
@@ -73,8 +73,8 @@ from the spec that pins it.
 Size budgets belong to the feature that introduced them. Once that feature
 ships, its measured delta remains historical; a later feature gets a new
 baseline at its own branch point instead of consuming or enlarging an older
-budget. NFR-606 and NFR-904 are historical, while NFR-805 and NFR-1001 remain
-live at the current spec boundary.
+budget. NFR-606, NFR-904, and NFR-1001 are historical, while NFR-805 and
+NFR-1201 remain live at the current spec boundary.
 
 The references have to come from the runner because both are properties of the
 environment as much as of the build: the panel column's height is a text metric
@@ -110,7 +110,7 @@ The title is passed to the validator through `env:`, never interpolated into a
 
 ### The one skipped test
 
-A passing `e2e-chromium` log reads **`85 passed, 1 skipped`**. The single skip is
+A passing `e2e-chromium` log reads **`94 passed, 1 skipped`**. The single skip is
 `tests/e2e/stop.spec.ts` → *VC-059 (BR-008): a 6-minute untouched run is still
 running*, which skips unless `RUN_LONG=1`.
 
@@ -462,7 +462,7 @@ cache) — the profile spec-01's thresholds were set against:
 |---|---|
 | `npm ci` (cold `node_modules`, warm npm cache) | 0.9 s |
 | `npm run build` | 4 s |
-| `npx playwright test --project=chromium` | 1.2 min (85 passed, 1 skipped) |
+| `npx playwright test --project=chromium` | 1.2 min (94 passed, 1 skipped) |
 | `npm run audit:contrast` | 6.5 s |
 | `npm run audit:perf` | 8.0 s |
 | `npm run test:matrix` (local only) | 51 s (6 passed, 2 skipped: no Edge engine) |

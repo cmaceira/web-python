@@ -8,14 +8,15 @@ follows the system), and gets inline Ruff lint diagnostics plus one-click PEP 8
 formatting. The editor also completes local
 names, Python built-ins, and Python 3.13 keywords entirely in the browser. When
 Python code is pasted, it also removes invisible formatting characters and
-repairs common typographic lookalikes outside strings and comments.
+repairs common typographic lookalikes outside strings and comments. The
+editor pairs brackets, braces, parentheses, and quotes as they are typed.
 
 Everything runs in the visitor's own browser:
 
 | Concern | How |
 |---|---|
 | Python | [Pyodide](https://pyodide.org) 0.28.x — CPython 3.13 compiled to WebAssembly — inside a dedicated Web Worker, self-hosted from this site's own origin |
-| Editor | CodeMirror 6 with `@codemirror/lang-python`; syntax-aware cleanup of suspicious Unicode characters pasted into `.py` files |
+| Editor | CodeMirror 6 with `@codemirror/lang-python`; pairs brackets and quotes as they are typed; syntax-aware cleanup of suspicious Unicode characters pasted into `.py` files |
 | Completion | Name-only CodeMirror completion from the current file, built-ins, and Python 3.13 hard/soft keywords; no language server or network request |
 | Lint + format | `@astral-sh/ruff-wasm-web` 0.14.x, self-hosted, default rule selection |
 | Blocking `input()` | A `SharedArrayBuffer` + `Atomics.wait` channel between the page and the worker |
@@ -39,6 +40,7 @@ limited to 2 MB for classroom exercises.
 - Offline name completion: [`specs/06-offline-completion.md`](specs/06-offline-completion.md)
 - Python paste sanitisation: [`specs/10-paste-sanitisation-frozen.md`](specs/10-paste-sanitisation-frozen.md)
 - Python Tab indentation: [`specs/11-tab-indentation-frozen.md`](specs/11-tab-indentation-frozen.md)
+- Auto-closing brackets and quotes: [`specs/12-auto-close-brackets-frozen.md`](specs/12-auto-close-brackets-frozen.md)
 - Deploying it: [`docs/deployment.md`](docs/deployment.md)
 - How it works inside: [`docs/architecture.md`](docs/architecture.md)
 - Working on it: [`CONTRIBUTING.md`](CONTRIBUTING.md)

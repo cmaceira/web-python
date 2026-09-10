@@ -1,7 +1,3 @@
-import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { gzipSync } from 'node:zlib';
 import { expect, test, type Page } from '@playwright/test';
 import {
   openPlayground,
@@ -17,41 +13,6 @@ const DIRTY_PROGRAM =
   'print(message, value)\u2029';
 
 const CLEAN_PROGRAM = 'message = "hello"\nvalue = 5 - 2\nprint(message, value)\n';
-
-interface BaselineBuild {
-  commit: string;
-  manifestUrlCount: number;
-  gzippedApp?: number;
-  gzippedBy?: string;
-  gzippedAppBy?: Record<string, number>;
-}
-
-const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
-const dist = join(repoRoot, 'dist');
-const PASTE_BASELINE_PATH =
-  process.env.PYPLAY_BASELINE_PASTE ??
-  join(repoRoot, 'tests', 'e2e', 'baseline-build-paste.json');
-const pasteBaseline = JSON.parse(readFileSync(PASTE_BASELINE_PATH, 'utf8')) as BaselineBuild;
-const compressor = `${process.platform}-${process.arch} zlib ${process.versions.zlib}`;
-const baselineApp =
-  pasteBaseline.gzippedAppBy?.[compressor] ??
-  (pasteBaseline.gzippedBy === compressor ? pasteBaseline.gzippedApp : undefined);
-const PASTE_SIZE_BUDGET_BYTES = 1024;
-
-if (process.env.PYPLAY_BASELINE_PASTE !== undefined && baselineApp === undefined) {
-  throw new Error(
-    `${PASTE_BASELINE_PATH} records no app size for "${compressor}" (gzipped by ` +
-      `"${pasteBaseline.gzippedBy}")`,
-  );
-}
-
-const uncoveredPasteCompressor =
-  `no ${pasteBaseline.commit} baseline for "${compressor}" — have: ` +
-  `${Object.keys(pasteBaseline.gzippedAppBy ?? {}).join(', ')}. Record with: ` +
-  `node scripts/record-baselines.mjs ${pasteBaseline.commit} --build <out.json>`;
-
-const isVendored = (url: string): boolean =>
-  url.startsWith('/pyodide/') || url.startsWith('/ruff/');
 
 async function writeClipboardAndPaste(page: Page, text: string): Promise<void> {
   await page.evaluate((value) => navigator.clipboard.writeText(value), text);
@@ -117,31 +78,11 @@ test('VC-1010 (BR-1001): non-Python text files preserve pasted characters exactl
   await expect(page.locator('#notices [data-notice]')).toHaveCount(0);
 });
 
-test('VC-1011 (NFR-1001): paste sanitisation adds ≤ 1 KiB gzip and no asset', async () => {
-  test.skip(baselineApp === undefined, uncoveredPasteCompressor);
-
-  const manifest = JSON.parse(readFileSync(join(dist, 'precache-manifest.json'), 'utf8')) as {
-    urls: string[];
-  };
-  let gzippedApp = 0;
-  for (const url of [...manifest.urls, '/index.html']) {
-    if (url === '/' || isVendored(url)) continue;
-    gzippedApp += gzipSync(readFileSync(join(dist, url.replace(/^\//, ''))), { level: 9 }).length;
-  }
-
-  const delta = gzippedApp - baselineApp!;
-  expect(
-    delta,
-    `NFR-1001 app size delta vs ${pasteBaseline.commit}: ${delta} B gzipped ` +
-      `(budget ${PASTE_SIZE_BUDGET_BYTES} B, compressor "${compressor}")`,
-  ).toBeLessThanOrEqual(PASTE_SIZE_BUDGET_BYTES);
-  expect(manifest.urls).toHaveLength(pasteBaseline.manifestUrlCount);
-
+test('VC-1011 (NFR-1001): paste sanitisation size is historical as of spec-12', () => {
   console.log(
     [
       'VC-1011 measurements:',
-      `  NFR-1001 app delta vs ${pasteBaseline.commit} ${delta} B (<= ${PASTE_SIZE_BUDGET_BYTES})`,
-      `  NFR-1001 precache URL count           ${manifest.urls.length} (unchanged)`,
+      '  NFR-1001 app size delta                 (historical — see specs/10-paste-sanitisation-frozen.md)',
     ].join('\n'),
   );
 });

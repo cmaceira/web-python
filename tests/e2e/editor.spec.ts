@@ -1,12 +1,52 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { gzipSync } from 'node:zlib';
 import { expect, test } from '@playwright/test';
 import {
   STARTER_PROGRAM,
+  editorSnapshot,
   editorText,
   openPlayground,
   setProgram,
   storedProgram,
   typeProgram,
 } from './helpers';
+
+interface BaselineBuild {
+  commit: string;
+  manifestUrlCount: number;
+  gzippedApp?: number;
+  gzippedBy?: string;
+  gzippedAppBy?: Record<string, number>;
+}
+
+const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+const dist = join(repoRoot, 'dist');
+const BRACKETS_BASELINE_PATH =
+  process.env.PYPLAY_BASELINE_BRACKETS ??
+  join(repoRoot, 'tests', 'e2e', 'baseline-build-brackets.json');
+const bracketsBaseline = JSON.parse(readFileSync(BRACKETS_BASELINE_PATH, 'utf8')) as BaselineBuild;
+const compressor = `${process.platform}-${process.arch} zlib ${process.versions.zlib}`;
+const bracketsBaselineApp =
+  bracketsBaseline.gzippedAppBy?.[compressor] ??
+  (bracketsBaseline.gzippedBy === compressor ? bracketsBaseline.gzippedApp : undefined);
+const BRACKETS_SIZE_BUDGET_BYTES = 2 * 1024;
+
+if (process.env.PYPLAY_BASELINE_BRACKETS !== undefined && bracketsBaselineApp === undefined) {
+  throw new Error(
+    `${BRACKETS_BASELINE_PATH} records no app size for "${compressor}" (gzipped by ` +
+      `"${bracketsBaseline.gzippedBy}")`,
+  );
+}
+
+const uncoveredBracketsCompressor =
+  `no ${bracketsBaseline.commit} baseline for "${compressor}" — have: ` +
+  `${Object.keys(bracketsBaseline.gzippedAppBy ?? {}).join(', ')}. Record with: ` +
+  `node scripts/record-baselines.mjs ${bracketsBaseline.commit} --build <out.json>`;
+
+const isVendored = (url: string): boolean =>
+  url.startsWith('/pyodide/') || url.startsWith('/ruff/');
 
 test('cross-origin isolation headers are served (BR-002)', async ({ page }) => {
   const response = await page.goto('/');
@@ -178,6 +218,116 @@ test('VC-1104 (FR-1104): whitespace dots and repeated indentation preserve grid 
   expect(after).toEqual(before);
   expect(await editorText(page)).toBe(`${' '.repeat(24)}${source}`);
   await expect(page.locator('.cm-highlightIndent')).toHaveCount(24);
+});
+
+test('VC-1201 (FR-1201): opening delimiters insert a matching closer around the caret', async ({
+  page,
+}) => {
+  await openPlayground(page);
+  const pairs: Array<[string, string]> = [
+    ['(', '()'],
+    ['[', '[]'],
+    ['{', '{}'],
+    ["'", "''"],
+    ['"', '""'],
+  ];
+
+  for (const [open, pair] of pairs) {
+    await setProgram(page, '');
+    await page.locator('.cm-content').click();
+    await page.keyboard.type(open);
+    expect(await editorSnapshot(page), open).toEqual({ text: pair, from: 1, to: 1 });
+  }
+});
+
+test('VC-1202 (FR-1202): typing an auto-inserted closer skips it instead of duplicating', async ({
+  page,
+}) => {
+  await openPlayground(page);
+  await setProgram(page, '');
+  await page.locator('.cm-content').click();
+  await page.keyboard.type('print()');
+  expect(await editorSnapshot(page)).toEqual({ text: 'print()', from: 7, to: 7 });
+});
+
+test('VC-1203 (FR-1203): Backspace deletes an empty automatically created pair', async ({
+  page,
+}) => {
+  await openPlayground(page);
+  await setProgram(page, '');
+  await page.locator('.cm-content').click();
+  await page.keyboard.type('(');
+  await page.keyboard.press('Backspace');
+  expect(await editorSnapshot(page)).toEqual({ text: '', from: 0, to: 0 });
+});
+
+test('VC-1204 (FR-1204): an opening delimiter wraps the current selection', async ({
+  page,
+}) => {
+  await openPlayground(page);
+  await setProgram(page, 'value');
+  await page.locator('.cm-content').click();
+  await page.keyboard.press('ControlOrMeta+a');
+  await page.keyboard.type('(');
+  expect(await editorSnapshot(page)).toEqual({ text: '(value)', from: 1, to: 6 });
+});
+
+test('VC-1205 (FR-1205): nested pairs undo and redo as ordinary editor edits', async ({
+  page,
+}) => {
+  await openPlayground(page);
+  await setProgram(page, '');
+  await page.locator('.cm-content').click();
+  await page.keyboard.type('(');
+  expect(await editorSnapshot(page)).toEqual({ text: '()', from: 1, to: 1 });
+  // CodeMirror joins `input.type` events within 500 ms. FR-1205 asks for
+  // nested pairs as ordinary edits, so the two insertions must be separate
+  // history events.
+  await page.waitForTimeout(600);
+  await page.keyboard.type('[');
+  expect(await editorSnapshot(page)).toEqual({ text: '([])', from: 2, to: 2 });
+
+  await page.keyboard.press('ControlOrMeta+z');
+  expect(await editorSnapshot(page)).toEqual({ text: '()', from: 1, to: 1 });
+  await page.keyboard.press('ControlOrMeta+z');
+  expect(await editorSnapshot(page)).toEqual({ text: '', from: 0, to: 0 });
+
+  // Redo restores the documents. Native history maps the caret through the
+  // inverted insert with assoc 1, so it lands after the reinserted pair
+  // rather than between the delimiters.
+  await page.keyboard.press('ControlOrMeta+Shift+Z');
+  expect((await editorSnapshot(page)).text).toBe('()');
+  await page.keyboard.press('ControlOrMeta+Shift+Z');
+  expect((await editorSnapshot(page)).text).toBe('([])');
+});
+
+test('VC-1206 (NFR-1201): pairing adds ≤ 2 KiB gzip and no asset', async () => {
+  test.skip(bracketsBaselineApp === undefined, uncoveredBracketsCompressor);
+
+  const manifest = JSON.parse(readFileSync(join(dist, 'precache-manifest.json'), 'utf8')) as {
+    urls: string[];
+  };
+  let gzippedApp = 0;
+  for (const url of [...manifest.urls, '/index.html']) {
+    if (url === '/' || isVendored(url)) continue;
+    gzippedApp += gzipSync(readFileSync(join(dist, url.replace(/^\//, ''))), { level: 9 }).length;
+  }
+
+  const delta = gzippedApp - bracketsBaselineApp!;
+  expect(
+    delta,
+    `NFR-1201 app size delta vs ${bracketsBaseline.commit}: ${delta} B gzipped ` +
+      `(budget ${BRACKETS_SIZE_BUDGET_BYTES} B, compressor "${compressor}")`,
+  ).toBeLessThanOrEqual(BRACKETS_SIZE_BUDGET_BYTES);
+  expect(manifest.urls).toHaveLength(bracketsBaseline.manifestUrlCount);
+
+  console.log(
+    [
+      'VC-1206 measurements:',
+      `  NFR-1201 app delta vs ${bracketsBaseline.commit} ${delta} B (<= ${BRACKETS_SIZE_BUDGET_BYTES})`,
+      `  NFR-1201 precache URL count           ${manifest.urls.length} (unchanged)`,
+    ].join('\n'),
+  );
 });
 
 test('VC-010 (FR-010): Reset replaces the buffer on confirm and leaves it on cancel', async ({

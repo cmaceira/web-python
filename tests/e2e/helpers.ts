@@ -2,7 +2,10 @@ import type { Page } from '@playwright/test';
 
 /** The slice of the CodeMirror view the helpers reach into from the page. */
 interface EditorViewLike {
-  state: { doc: { length: number } };
+  state: {
+    doc: { length: number; toString(): string };
+    selection: { main: { from: number; to: number } };
+  };
   dispatch(spec: unknown): void;
 }
 
@@ -198,6 +201,24 @@ export async function setProgram(page: Page, code: string): Promise<void> {
     if (!view) throw new Error('CodeMirror view not found');
     view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: text } });
   }, code);
+}
+
+/** Document bytes and the main selection, read from the live CodeMirror view. */
+export async function editorSnapshot(
+  page: Page,
+): Promise<{ text: string; from: number; to: number }> {
+  return page.evaluate(() => {
+    const content = document.querySelector('.cm-content') as
+      | (HTMLElement & {
+          cmView?: { view: EditorViewLike };
+          cmTile?: { view: EditorViewLike };
+        })
+      | null;
+    const view = content?.cmTile?.view ?? content?.cmView?.view;
+    if (!view) throw new Error('CodeMirror view not found');
+    const { from, to } = view.state.selection.main;
+    return { text: view.state.doc.toString(), from, to };
+  });
 }
 
 /** The console's spans, in DOM order, with the class that styled each one. */

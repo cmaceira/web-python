@@ -87,6 +87,11 @@ feature to the diagnostics branch point. Its hit-target and latency assertions
 remain live. Paste sanitisation carries the independently anchored NFR-1001
 budget instead.
 
+**Amendment (spec-12, 2026-09-10):** NFR-1001's ≤ 1 KiB ship measurement vs
+`2eb0bd4` (`v0.6.0`) is immutable; VC-1011 no longer subtracts later whole-app
+builds from that baseline. Pairing carries the independently anchored NFR-1201
+budget instead.
+
 ## Interfaces
 
 - `sanitizePythonPaste(document, pastedRanges)` is a deterministic helper that

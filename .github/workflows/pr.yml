@@ -169,7 +169,7 @@ jobs:
         if: steps.browsers.outputs.cache-hit == 'true'
         run: npx playwright install-deps chromium
       # VC-408 compares this build's rendered geometry against a pinned
-      # commit's, and the live app-size budgets (NFR-805 / NFR-1001) compare
+      # commit's, and the live app-size budgets (NFR-805 / NFR-1201) compare
       # compressed payloads against theirs. Those references are
       # environment-dependent: the column's height is a text metric, and
       # `gzipSync` is only as reproducible as the zlib Node was linked
@@ -189,13 +189,13 @@ jobs:
             "$(node -p "require('./tests/e2e/baseline-build-completion.json').commit")" \
             --build "${RUNNER_TEMP}/baseline-build.json"
           node scripts/record-baselines.mjs \
-            "$(node -p "require('./tests/e2e/baseline-build-paste.json').commit")" \
-            --build "${RUNNER_TEMP}/baseline-build-paste.json"
+            "$(node -p "require('./tests/e2e/baseline-build-brackets.json').commit")" \
+            --build "${RUNNER_TEMP}/baseline-build-brackets.json"
       - name: End-to-end suite
         env:
           PYPLAY_BASELINE_GEOMETRY: ${{ runner.temp }}/baseline-geometry.json
           PYPLAY_BASELINE_BUILD: ${{ runner.temp }}/baseline-build.json
-          PYPLAY_BASELINE_PASTE: ${{ runner.temp }}/baseline-build-paste.json
+          PYPLAY_BASELINE_BRACKETS: ${{ runner.temp }}/baseline-build-brackets.json
         # The log reports exactly one skip: VC-059's six-minute variant, which
         # `Scope -> Out` excludes and which no workflow may enable. Keeping the
         # command unnarrowed preserves FR-104's "same set as a local run"; see
@@ -294,7 +294,7 @@ jobs:
       - name: Install the chromium system dependencies only
         if: steps.browsers.outputs.cache-hit == 'true'
         run: npx playwright install-deps chromium
-      # Live app-size budgets (NFR-805 / NFR-1001), recorded by the runner that
+      # Live app-size budgets (NFR-805 / NFR-1201), recorded by the runner that
       # measures them — see the same step in `e2e-chromium` for why.
       # Completion's NFR-606 size gate is historical; the completion record
       # still feeds VC-429's shape checks via PYPLAY_BASELINE_BUILD.
@@ -304,12 +304,12 @@ jobs:
             "$(node -p "require('./tests/e2e/baseline-build-completion.json').commit")" \
             --build "${RUNNER_TEMP}/baseline-build.json"
           node scripts/record-baselines.mjs \
-            "$(node -p "require('./tests/e2e/baseline-build-paste.json').commit")" \
-            --build "${RUNNER_TEMP}/baseline-build-paste.json"
+            "$(node -p "require('./tests/e2e/baseline-build-brackets.json').commit")" \
+            --build "${RUNNER_TEMP}/baseline-build-brackets.json"
       - name: Performance audit
         env:
           PYPLAY_BASELINE_BUILD: ${{ runner.temp }}/baseline-build.json
-          PYPLAY_BASELINE_PASTE: ${{ runner.temp }}/baseline-build-paste.json
+          PYPLAY_BASELINE_BRACKETS: ${{ runner.temp }}/baseline-build-brackets.json
         run: npm run audit:perf
       - name: Upload the report and traces
         if: failure()

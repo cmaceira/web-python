@@ -129,7 +129,7 @@ major (**including from `0.x`**), `chore`/`docs`/`style`/`refactor`/`test`/`buil
 
 Seven required checks gate the merge: `pr-title`, `typecheck`, `unit`, `e2e-chromium`,
 `audit-contrast`, `audit-perf`, `artifact` — all runnable locally with identical
-commands. A passing `e2e-chromium` reads `85 passed, 1 skipped`; that one skip
+commands. A passing `e2e-chromium` reads `94 passed, 1 skipped`; that one skip
 (VC-059's six-minute variant) is the only permitted one.
 
 On merge, the release pipeline re-runs the gate against `main` and, if the bump is not

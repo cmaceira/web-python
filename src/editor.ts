@@ -12,7 +12,12 @@ import {
   type DecorationSet,
 } from '@codemirror/view';
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands';
-import { acceptCompletion, autocompletion } from '@codemirror/autocomplete';
+import {
+  acceptCompletion,
+  autocompletion,
+  closeBrackets,
+  closeBracketsKeymap,
+} from '@codemirror/autocomplete';
 import {
   HighlightStyle,
   bracketMatching,
@@ -161,6 +166,10 @@ export function createEditor({
     history(),
     indentOnInput(),
     bracketMatching(),
+    // FR-1201 – FR-1205 / BR-1201: CodeMirror's native pairing, skip-over,
+    // empty-pair Backspace and surround-selection. Python language data
+    // supplies the delimiter set and string prefixes.
+    closeBrackets(),
     indentUnit.of('    '),
     syntaxHighlighting(pyHighlight),
     python(),
@@ -197,7 +206,9 @@ export function createEditor({
     // Issue #31: CodeMirror's native binding indents and dedents whole lines
     // with `indentUnit`, which is four ASCII spaces above. The default keymap
     // keeps Ctrl+M (Shift+Alt+M on macOS) as the accessible Tab-focus escape.
-    keymap.of([indentWithTab, ...defaultKeymap, ...historyKeymap]),
+    // BR-1201: closeBracketsKeymap is first so empty-pair Backspace is tried
+    // before defaultKeymap's deleteCharBackward.
+    keymap.of([...closeBracketsKeymap, indentWithTab, ...defaultKeymap, ...historyKeymap]),
     EditorView.lineWrapping,
     EditorView.updateListener.of((update) => {
       if (update.docChanged) onChange(update.state.doc.toString());

@@ -123,7 +123,9 @@ test('VC-043 (FR-041): a syntax error is an error-severity diagnostic at its pos
 }) => {
   await openPlayground(page);
   await waitForLinter(page);
-  await typeProgram(page, 'def f(:');
+  // Dispatch the buffer rather than type it: auto-closed `()` would otherwise
+  // leave `def f(:)` and move the diagnostic column (FR-1201).
+  await setProgram(page, 'def f(:');
 
   await expect
     .poll(() => diagnosticEntries(page), { timeout: LINT_SETTLE_MS + 2000 })

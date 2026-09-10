@@ -6,7 +6,7 @@ the implementation deliberately differs from the spec's *Data & Interfaces*.
 ```
 ┌──────────────────────────── main thread ────────────────────────────┐
 │  index.html + src/main.ts                                           │
-│    flat file tree + CodeMirror + completion + Tab indentation + paste │
+│    flat file tree + CodeMirror + indent + pairing + paste cleanup     │
 │      └─ autosave → localStorage['pyplay.workspace.v1']               │
 │    color mode ── pyplay.theme.v1; editor darkTheme from effective   │
 │    layout ── pyplay.layout.v2; #app[data-layout] drives the grid    │
@@ -54,6 +54,13 @@ left alone. The editor panel and CodeMirror scroller cap their inline size,
 while the vertical Files/Editor/Console tracks use `minmax(0, …)` so
 indentation stays inside the editor's own scrolling area instead of
 redistributing the page columns.
+
+CodeMirror's native `closeBrackets` extension pairs `(`, `[`, `{`, `'`, and
+`"` as the visitor types, skips a closer that is already present, wraps a
+selection, and lets Backspace delete an empty pair. `closeBracketsKeymap`
+runs ahead of the default keymap so its Backspace binding is tried first.
+`@codemirror/lang-python` supplies the delimiter set and string prefixes; the
+playground adds no custom handler for these characters.
 
 ---
 
