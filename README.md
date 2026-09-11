@@ -185,6 +185,15 @@ Full detail, including the caches, the fork-PR permission model and the
 repository settings that live outside this repository:
 [`docs/ci.md`](docs/ci.md).
 
+## License
+
+The source code authored for Python Playground is licensed under the
+[Apache License 2.0](LICENSE). Copyright © fclabs.
+
+Python Playground includes and bundles third-party open-source components.
+Their license terms remain applicable and are listed in
+[`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+
 ## Keyboard
 
 | Key | Action |
