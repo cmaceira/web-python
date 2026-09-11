@@ -395,6 +395,35 @@ test('VC-501 (FR-501): #btn-theme follows Symbols; #btn-about is last after them
 test.describe('cycle under OS light', () => {
   test.use({ colorScheme: 'light' });
 
+  test('Issue #14: Files sidebar keeps its grid track while the theme changes', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await seedTheme(page, 'light');
+    await openPlayground(page);
+
+    const filesLayout = () => page.evaluate(() => {
+      const app = document.getElementById('app')!;
+      const pane = document.getElementById('file-pane')!;
+      return {
+        gridColumns: getComputedStyle(app).gridTemplateColumns,
+        paneWidth: pane.getBoundingClientRect().width,
+        configuredWidth: getComputedStyle(document.documentElement)
+          .getPropertyValue('--files-width')
+          .trim(),
+      };
+    });
+
+    const before = await filesLayout();
+    expect(before.configuredWidth).toBe('260px');
+    expect(before.paneWidth).toBeGreaterThanOrEqual(260);
+
+    const theme = page.locator('#btn-theme');
+    await theme.click();
+    expect(await filesLayout()).toEqual(before);
+
+    await theme.click();
+    expect(await filesLayout()).toEqual(before);
+  });
+
   test('VC-502 (FR-502, FR-512, BR-501): full cycle updates chrome, editor, and storage', async ({
     page,
   }) => {

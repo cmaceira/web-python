@@ -9,6 +9,9 @@
 :root {
   --font-ui: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  /* Geometry belongs to the application, not to either color palette. Issue #14:
+     keeping this in the light palette invalidated Files' grid track on dark. */
+  --files-width: 260px;
 }
 
 [data-theme="light"],
@@ -55,7 +58,6 @@
   --disabled-border: #777d87;
   --font-ui: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
-  --files-width: 260px;
   /* NFR-803: scrim vs --bg ≥ 3:1 (black alpha; transparent mixes toward black). */
   --about-backdrop: color-mix(in srgb, #000000 50%, transparent);
 }
