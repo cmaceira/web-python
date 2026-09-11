@@ -22,7 +22,7 @@
  * environment it is recorded on, and covers none it has not seen.
  */
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { gzipSync } from 'node:zlib';
 
@@ -79,10 +79,15 @@ const compressor = `${process.platform}-${process.arch} zlib ${process.versions.
  * skip on every other. Entries for a different commit are dropped: they are
  * measurements of a different tree.
  */
-const previous =
-  existsSync(out) && JSON.parse(readFileSync(out, 'utf8')).commit === commit
-    ? JSON.parse(readFileSync(out, 'utf8'))
-    : {};
+let previous = {};
+try {
+  // Read first and judge what came back: an `existsSync` guard would be a
+  // check on a name rather than on the bytes actually read (CWE-367).
+  const recorded = JSON.parse(readFileSync(out, 'utf8'));
+  if (recorded.commit === commit) previous = recorded;
+} catch {
+  // No record yet, or one this run cannot parse: start a fresh one.
+}
 const gzippedAppBy = { ...previous.gzippedAppBy, [compressor]: gzippedApp };
 
 writeFileSync(
