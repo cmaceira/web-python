@@ -449,7 +449,9 @@ test.describe('the two-column layout', () => {
 
       // The files pane (undocumented by spec-04) opens by default at this
       // width; close it so FR-409's split is measured the way this frozen
-      // requirement defines it — the editor/console column alone.
+      // requirement defines it — the editor/console column alone. spec-13
+      // FR-1306: Output is shown and no `pyplay.output-width.v1` is set, so
+      // the 58 % default still holds (VC-1312).
       await page.locator('#btn-files').click();
       await expect(page.locator('#file-pane')).toBeHidden();
 
@@ -1003,8 +1005,8 @@ test.describe('the layout control', () => {
      * The real tab order, walked with `Tab` rather than inferred from a DOM
      * query — which is what BR-407 is about. Each stop is recorded as the
      * `aria-label` of the panel that contains it, so the sequence reads as the
-     * columns the visitor traverses. `#diag-resizer` is a non-panel stop
-     * between editor and stdin (spec-09 FR-913); it is recorded by id.
+     * columns the visitor traverses. `#output-resizer` then `#diag-resizer`
+     * sit between editor and stdin (spec-13 FR-1305 / spec-09 FR-913).
      */
     await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
     await page.locator('body').click({ position: { x: 2, y: 2 } });
@@ -1026,10 +1028,13 @@ test.describe('the layout control', () => {
               : el.id,
           isEntry: el.classList.contains('diagnostic-entry'),
           isDiagResizer: el.id === 'diag-resizer',
+          isOutputResizer: el.id === 'output-resizer',
         };
       });
       if (!stop) break;
-      if (stop.panel || stop.isDiagResizer) stops.push({ panel: stop.panel, target: stop.target });
+      if (stop.panel || stop.isDiagResizer || stop.isOutputResizer) {
+        stops.push({ panel: stop.panel, target: stop.target });
+      }
       if (stop.isEntry) break;
       // Issue #31: CodeMirror captures Tab for indentation until Ctrl+M turns
       // on its standard Tab-focus mode.
@@ -1043,10 +1048,11 @@ test.describe('the layout control', () => {
       'the console holds no focusable element',
     ).toEqual([]);
 
-    // The left column's stop precedes every right-column stop; the diagnostics
-    // resizer sits between editor and stdin in document order (FR-913).
+    // The left column's stop precedes every right-column stop; the output then
+    // diagnostics resizers sit between editor and stdin (FR-1305 / FR-913).
     expect(stops.map((stop) => stop.target)).toEqual([
       'editor',
+      'output-resizer',
       'diag-resizer',
       'stdin-input',
       'btn-eof',
@@ -1054,6 +1060,7 @@ test.describe('the layout control', () => {
     ]);
     expect(stops.map((stop) => stop.panel)).toEqual([
       'Editor',
+      '',
       '',
       'Standard input',
       'Standard input',
@@ -1327,38 +1334,41 @@ test('VC-407 (FR-049 from spec-01, FR-405): Tab reaches every control once in bo
     return reached;
   };
 
-  /** Toolbar → editor → stdin → diagnostics. Horizontal hides `#diag-resizer`. */
-  const EXPECTED_HORIZONTAL = [
+  const TOOLBAR_STOPS = [
     'btn-run',
     'btn-stop',
     'btn-clear',
     'btn-copy',
     'btn-format',
     'btn-reset',
-    // spec-04 FR-405 / parent VC-052: exactly one stop for the whole group,
-    // however many radios it holds.
     'layout-group',
-    // The files toggle (undocumented by spec-04), immediately after the
-    // layout group. The pane's own internal stops sit after `Diagnostics` in
-    // the document, past where this enumeration stops.
     'btn-files',
-    // spec-03 FR-301.
+    'btn-output',
     'btn-symbols',
-    // spec-05 FR-501: the color-mode control, immediately after Symbols.
     'btn-theme',
-    // spec-08 FR-801: About, immediately after theme.
     'btn-about',
+  ] as const;
+
+  /** Stacked: console height handle, then editor, then Problems handle, then stdin. */
+  const EXPECTED_HORIZONTAL = [
+    ...TOOLBAR_STOPS,
+    'console-resizer',
     'editor',
+    'diag-resizer',
     'stdin-input',
     'btn-eof',
     'diagnostic-entry',
   ];
 
-  /** Vertical ≥ 900 inserts `#diag-resizer` between editor and stdin (FR-913). */
+  /** Vertical ≥ 900: editor, column handle, Problems handle, stdin (FR-1305 / FR-913). */
   const EXPECTED_VERTICAL = [
-    ...EXPECTED_HORIZONTAL.slice(0, EXPECTED_HORIZONTAL.indexOf('stdin-input')),
+    ...TOOLBAR_STOPS,
+    'editor',
+    'output-resizer',
     'diag-resizer',
-    ...EXPECTED_HORIZONTAL.slice(EXPECTED_HORIZONTAL.indexOf('stdin-input')),
+    'stdin-input',
+    'btn-eof',
+    'diagnostic-entry',
   ];
 
   expect(await renderedLayout(page)).toBe('horizontal');

@@ -11,6 +11,7 @@ the implementation deliberately differs from the spec's *Data & Interfaces*.
 │    color mode ── pyplay.theme.v1; editor darkTheme from effective   │
 │    layout ── pyplay.layout.v2; #app[data-layout] drives the grid    │
 │    diagnostics height ── pyplay.diagnostics-height.v1; #diag-resizer │
+│    output pane ── pyplay.output-visible.v1 + pyplay.output-width.v1  │
 │    console (rAF-batched, bounded)                                   │
 │    status bar, toolbar, stdin field, diagnostics panel              │
 │    Ruff-WASM (lint + format, in-thread)                             │
@@ -528,8 +529,9 @@ In the two-column (`vertical`) layout at ≥ 900 px the Problems panel under
 Input starts at the same **content-sized empty height** as the stacked
 (`horizontal`) layout — Problems title, live count, and empty/body line, not a
 free-space fraction — so the console keeps the room. Visitors who need a taller
-list enlarge it; the chosen height is remembered on this origin. This is not a
-hide or collapse of either panel (issue #21); both stay in the layout.
+list enlarge it; the chosen height is remembered on this origin. Hide of the
+whole stack is spec-13 (`#btn-output` / `#output-resizer`); spec-09 still
+only splits Console vs Problems *inside* the column when Output is shown.
 
 #### How the height is applied
 
@@ -554,8 +556,9 @@ does not flash a large free-space share.
 and accessible name `Resize diagnostics panel`. Pointer drag and `ArrowUp` /
 `ArrowDown` (with `Shift` for a larger step) reallocate free space between the
 console and diagnostics; stdin stays content-sized. Outside vertical layout at
-≥ 900 px the control is CSS-hidden and made inert with `setInert()` — never the
-HTML `disabled` attribute — so every activation path is a no-op.
+≥ 900 px, or while Output is hidden (spec-13), the control is CSS-hidden and
+made inert with `setInert()` — never the HTML `disabled` attribute — so every
+activation path is a no-op.
 
 #### Bounds and persistence
 
@@ -575,6 +578,41 @@ does **not** rewrite storage until the visitor next commits a resize. Missing
 or non-canonical stored values are treated as absent (content-sized default) and
 left in place. A rejected write still applies the height for the session and
 shows `Diagnostics height won't be remembered` at most once per page load.
+
+### Output pane (hide and column width)
+
+Console, Input, and Problems are one Output pane. `#btn-output` sits
+immediately after `#btn-files` in the leading toolbar cluster and toggles
+`hidden` on `#console-pane`, `#stdin-pane`, and `#diagnostics-pane` together
+— document order is unchanged, so CodeMirror is never re-parented. The editor
+(and Files / Symbols if open) takes the freed space.
+
+A pending `input()` / `sys.stdin` read is the one exception: `#stdin-pane`
+unhides on its own (`#app[data-stdin="pending"]`) so FR-029's field is
+reachable, then hides again when the read ends if Output is still hidden.
+`aria-expanded` on the toggle tracks the preference, not that exception.
+
+In the two-column layout at ≥ 900 px, `#output-resizer` overlays the output
+column's inline-start edge (`role="separator"`, vertical, 8 px hit target)
+without adding a grid track — an extra column would insert another `.app`
+gap and shrink FR-409's 58 % split. Pointer drag and Arrow keys (16 px;
+Shift 48 px; ArrowRight grows output) clamp to 240 px min / leftover after
+the 320 px editor floor, Files, Symbols, and gaps. Unset width keeps the
+58 % default; a committed resize sets `--output-width` on
+`document.documentElement` (geometry, not a palette token — issue #14).
+
+Both preferences persist on the origin: `pyplay.output-visible.v1` is
+`shown` or `hidden`; `pyplay.output-width.v1` is a canonical integer px
+string. A render-blocking bootstrap in `index.html` applies them before
+first paint so a restored `hidden` never flashes the console column.
+Viewport-only clamps update ARIA, not storage. Failed writes still apply
+in memory and show a one-shot notice per key.
+
+Stacked / horizontal layout can hide Output and has no *column* splitter.
+While Output is shown it does resize **heights**: `#console-resizer` on the
+console's bottom edge and `#diag-resizer` overlaid on the top of Problems
+(spec-01's 30 % / `25vh` defaults until the visitor commits). Both handles
+are inert while Output is hidden.
 
 ### The control
 
@@ -602,18 +640,19 @@ in `specs/04-toogle-pane-aspect-frozen.md`.
 
 At viewports ≥ 900 px the toolbar is still one `flex` row with a fixed DOM
 order, but it *looks* like two clusters: a leading action group (`#btn-run`
-through `#btn-files`, including `#layout-group`) packed at the inline-start
-edge, and a presentation cluster (`#btn-symbols`, `#btn-theme`, `#btn-about`)
-flush with the inline-end edge. The split exists because the leading controls
-act on the visitor's program / workspace while the trailing three act on how
-the page is presented or identified; collecting free space between those
-groups keeps the presentation cluster at a stable screen edge that does not
-shift when `#run-file-name` re-labels `Run`.
+through `#btn-output`, including `#layout-group` and `#btn-files`) packed at
+the inline-start edge, and a presentation cluster (`#btn-symbols`,
+`#btn-theme`, `#btn-about`) flush with the inline-end edge. The split exists
+because the leading controls act on the visitor's program / workspace /
+output while the trailing three act on how the page is presented or
+identified; collecting free space between those groups keeps the presentation
+cluster at a stable screen edge that does not shift when `#run-file-name`
+re-labels `Run`.
 
 The mechanism is presentational only: inside the same `@media (min-width:
 900px)` block that mirrors `LAYOUT_MIN_WIDTH`, the toolbar sets
 `flex-wrap: nowrap` and `#btn-symbols` gets `margin-inline-start: auto`. Flex
-then parks all slack on that line between `#btn-files` and `#btn-symbols`, so
+then parks all slack on that line between `#btn-output` and `#btn-symbols`, so
 `#btn-theme` and `#btn-about` (the next siblings, still separated by the
 toolbar's `6px` gap) ride with it to the inline-end. `#btn-about` is the
 flush edge (spec-08). Nowrap is required because a wrapped row at exactly
@@ -621,12 +660,13 @@ flush edge (spec-08). Nowrap is required because a wrapped row at exactly
 onto the next line alone when OS fonts run slightly wide; flex shrink absorbs
 that variance instead. The margin uses a logical property so the arrangement
 tracks writing direction the same way the layout switch does. `#btn-files`
-stays in the leading cluster because it is a workspace control, not a
-presentation control — only the named cluster moves visually.
+and `#btn-output` stay in the leading cluster because they are workspace /
+output controls, not presentation controls — only the named cluster moves
+visually.
 
 Nothing is re-parented or reordered in the DOM, so tab order and assistive
-enumeration stay `#btn-run` … `#layout-group` … `#btn-files` … `#btn-symbols`
-… `#btn-theme` … `#btn-about`. Below 900 px neither rule applies: the toolbar
+enumeration stay `#btn-run` … `#layout-group` … `#btn-files` … `#btn-output`
+… `#btn-symbols` … `#btn-theme` … `#btn-about`. Below 900 px neither rule applies: the toolbar
 keeps `flex-wrap: wrap` and packs every control on every line against the
 inline-start edge exactly as it did before.
 
@@ -723,7 +763,7 @@ lives in `src/format.ts` with the rest of the chrome strings.
 
 ## Storage surface
 
-The origin holds exactly five things, and nothing else — no cookies, no
+The origin holds exactly eight things, and nothing else — no cookies, no
 IndexedDB, no `sessionStorage`:
 
 | Store | Key | Contents |
@@ -732,6 +772,9 @@ IndexedDB, no `sessionStorage`:
 | `localStorage` | `pyplay.theme.v1` | exactly `light`, `dark`, or `system` — raw string, no JSON |
 | `localStorage` | `pyplay.workspace.v1` | versioned flat workspace: active filename plus Base64 file bytes, capped at 2 MB |
 | `localStorage` | `pyplay.diagnostics-height.v1` | canonical diagnostics panel height in CSS px: `^[1-9][0-9]*$` (e.g. `36`) — no JSON, no units, no whitespace |
+| `localStorage` | `pyplay.output-visible.v1` | exactly `shown` or `hidden` — raw string, no JSON |
+| `localStorage` | `pyplay.output-width.v1` | canonical output-column width in CSS px: `^[1-9][0-9]*$` (e.g. `420`) — no JSON, no units, no whitespace |
+| `localStorage` | `pyplay.console-height.v1` | canonical stacked console height in CSS px: `^[1-9][0-9]*$` |
 | Cache Storage | `pyplay-assets-v<build>` | the precached static assets; older buckets are deleted on activation |
 
 The workspace begins with the same friendly UTF-8 `main.py` used by the
@@ -766,6 +809,11 @@ applies the layout for the session (FR-418, BR-406).
 *Diagnostics height in the two-column layout* above). Non-canonical values are
 treated as absent and left in place; a rejected write keeps the in-memory
 height and shows its own one-shot notice.
+
+`pyplay.output-visible.v1` is written synchronously on toggle; 
+`pyplay.output-width.v1` only on a committed column resize (see *Output pane*
+above). The same leave-in-place / one-shot-notice rules apply, independently
+per key.
 
 ---
 

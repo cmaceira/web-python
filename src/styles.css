@@ -10,7 +10,9 @@
   --font-ui: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
   /* Geometry belongs to the application, not to either color palette. Issue #14:
-     keeping this in the light palette invalidated Files' grid track on dark. */
+     keeping this in the light palette invalidated Files' grid track on dark.
+     `--output-width` is set only when a visitor has committed a resize
+     (FR-1306 / BR-1303); it is not a default here so CSS keeps FR-409's 58 %. */
   --files-width: 260px;
 }
 
@@ -133,6 +135,7 @@ body {
   height: 100%;
   max-width: 100%;
   padding: 8px;
+  position: relative;
 }
 
 /* Toolbar --------------------------------------------------------------- */
@@ -309,8 +312,9 @@ body {
 }
 
 .panel--console {
-  flex: 1 1 30%;
   display: flex;
+  flex: 1 1 30%;
+  position: relative;
 }
 
 .panel--editor {
@@ -324,6 +328,27 @@ body {
 
 /* Flat classroom workspace ------------------------------------------------ */
 #file-pane[hidden] {
+  display: none;
+}
+
+/* FR-1311 / FR-1302: first-paint hide (bootstrap sets html[data-output] before
+   the panels exist) plus the `hidden` attribute once JS has run. Stdin is
+   restored independently while a read is pending (FR-1303). */
+html[data-output='hidden'] .panel--console,
+html[data-output='hidden'] .panel--diagnostics,
+html[data-output='hidden'] .diag-resizer,
+html[data-output='hidden'] .output-resizer,
+html[data-output='hidden'] .panel--stdin {
+  display: none;
+}
+
+html[data-output='hidden'] #app[data-stdin='pending'] .panel--stdin {
+  display: block;
+}
+
+#console-pane[hidden],
+#stdin-pane[hidden],
+#diagnostics-pane[hidden] {
   display: none;
 }
 
@@ -411,6 +436,20 @@ body {
   min-width: 0;
 }
 
+/* FR-1313 / VC-705: 12 px inline pad overflowed About by ~3 px at the 900 px
+   nowrap floor once Output joined the leading cluster. Hit area stays ≥ 32. */
+#btn-output {
+  padding-inline: 10px;
+}
+
+/* Open Files / Output read as selected, like a file-tree item — not the idle
+   chrome of a one-shot action. Closed is the default `.btn` rest. */
+#btn-files[aria-expanded='true'],
+#btn-output[aria-expanded='true'] {
+  background: color-mix(in srgb, var(--accent) 18%, var(--bg-raised));
+  border-color: var(--accent);
+}
+
 #run-action {
   flex: 0 0 auto;
   font-weight: 700;
@@ -422,6 +461,9 @@ body {
   font-size: 12px;
   font-weight: 500;
   max-inline-size: min(28ch, calc(100vw - 96px));
+  /* FR-1313 / VC-705: `#btn-output` joins the leading cluster; at the 900 px
+     nowrap floor this label is the shrink valve so About stays flush. */
+  min-inline-size: 0;
   overflow: hidden;
   padding-left: 8px;
   text-overflow: ellipsis;
@@ -436,6 +478,62 @@ body {
 }
 
 .file-resizer {
+  display: none;
+}
+
+/* FR-1305: overlay; shown only in vertical ≥ 900 with Output visible. */
+.output-resizer {
+  display: none;
+}
+
+.console-resizer {
+  display: none;
+}
+
+/* FR-1314: stacked console/problems height handles. 8 px hit, 1 px hairline. */
+#app:not([data-layout='vertical']) .console-resizer {
+  background: var(--border);
+  background-clip: content-box;
+  bottom: 0;
+  cursor: row-resize;
+  display: block;
+  height: 8px;
+  left: 0;
+  outline-offset: 2px;
+  padding-block: 3.5px;
+  position: absolute;
+  right: 0;
+  z-index: 2;
+}
+
+#app:not([data-layout='vertical']) .console-resizer:hover,
+#app:not([data-layout='vertical']) .console-resizer:focus-visible {
+  background: var(--focus);
+  padding-block: 3px;
+}
+
+#app:not([data-layout='vertical']) .console-resizer[hidden] {
+  display: none;
+}
+
+#app:not([data-layout='vertical']) .diag-resizer {
+  background: var(--border);
+  background-clip: content-box;
+  cursor: row-resize;
+  display: block;
+  min-height: 8px;
+  outline-offset: 2px;
+  padding-block: 3.5px;
+}
+
+#app:not([data-layout='vertical']) .diag-resizer:hover,
+#app:not([data-layout='vertical']) .diag-resizer:focus-visible {
+  background: var(--focus);
+  padding-block: 3px;
+}
+
+#app:not([data-layout='vertical']) .diag-resizer[hidden],
+html[data-output='hidden'] #app:not([data-layout='vertical']) .diag-resizer {
   display: none;
 }
 
@@ -626,6 +724,21 @@ body {
   max-height: 25vh;
   overflow: auto;
   padding: 6px 8px;
+}
+
+html[data-console-sized] #app:not([data-layout='vertical']) .panel--console {
+  flex: 0 0 var(--console-height);
+  min-height: 80px;
+}
+
+html[data-console-sized] #app:not([data-layout='vertical']) .panel--editor {
+  flex: 1 1 auto;
+}
+
+html[data-diag-sized] #app:not([data-layout='vertical']) .panel--diagnostics {
+  flex: 0 0 var(--diagnostics-height);
+  height: var(--diagnostics-height);
+  max-height: none;
 }
 
 .panel-title {
@@ -903,6 +1016,83 @@ body {
     grid-template-columns: minmax(160px, var(--files-width)) minmax(0, 1fr) 72px;
   }
 
+  /* FR-1302 / FR-1304: stacked + Files, Output hidden — drop console/stdin/diag
+     rows so the leftover `minmax(80px, 1fr)` console track cannot sit empty. */
+  html[data-output='hidden'] .app:not([data-layout='vertical']):has(#file-pane:not([hidden])) {
+    grid-template-areas:
+      "toolbar toolbar"
+      "banner banner"
+      "status status"
+      "notices notices"
+      "files editor";
+    grid-template-columns: minmax(160px, var(--files-width)) minmax(0, 1fr);
+    grid-template-rows: auto auto auto auto minmax(120px, 1fr);
+  }
+
+  html[data-output='hidden'] .app:not([data-layout='vertical']):has(#file-pane:not([hidden])):has(#symbol-pane:not([hidden])) {
+    grid-template-areas:
+      "toolbar toolbar toolbar"
+      "banner banner banner"
+      "status status status"
+      "notices notices notices"
+      "files editor symbols";
+    grid-template-columns: minmax(160px, var(--files-width)) minmax(0, 1fr) 72px;
+    grid-template-rows: auto auto auto auto minmax(120px, 1fr);
+  }
+
+  html[data-output='hidden'] #app[data-stdin='pending']:not([data-layout='vertical']):has(#file-pane:not([hidden])) {
+    grid-template-areas:
+      "toolbar toolbar"
+      "banner banner"
+      "status status"
+      "notices notices"
+      "files editor"
+      "files stdin";
+    grid-template-columns: minmax(160px, var(--files-width)) minmax(0, 1fr);
+    grid-template-rows: auto auto auto auto minmax(120px, 1fr) auto;
+  }
+
+  html[data-output='hidden'] #app[data-stdin='pending']:not([data-layout='vertical']):has(#file-pane:not([hidden])):has(#symbol-pane:not([hidden])) {
+    grid-template-areas:
+      "toolbar toolbar toolbar"
+      "banner banner banner"
+      "status status status"
+      "notices notices notices"
+      "files editor symbols"
+      "files stdin symbols";
+    grid-template-columns: minmax(160px, var(--files-width)) minmax(0, 1fr) 72px;
+    grid-template-rows: auto auto auto auto minmax(120px, 1fr) auto;
+  }
+
+  /* FR-1302: stacked + Symbols, Output hidden (no Files). Less specific than
+     the Files+Symbols rules above, so those still win when both panes open. */
+  html[data-output='hidden'] .app:not([data-layout='vertical']):has(#symbol-pane:not([hidden])) {
+    grid-template-areas:
+      "toolbar toolbar"
+      "banner banner"
+      "status status"
+      "notices notices"
+      "editor symbols";
+    grid-template-columns: minmax(0, 1fr) 72px;
+    grid-template-rows: auto auto auto auto minmax(120px, 1fr);
+  }
+
+  html[data-console-sized] .app:not([data-layout='vertical']):has(#file-pane:not([hidden])) {
+    grid-template-rows: auto auto auto auto var(--console-height) minmax(120px, 1fr) auto auto;
+  }
+
+  html[data-output='hidden'] #app[data-stdin='pending']:not([data-layout='vertical']):has(#symbol-pane:not([hidden])) {
+    grid-template-areas:
+      "toolbar toolbar"
+      "banner banner"
+      "status status"
+      "notices notices"
+      "editor symbols"
+      "stdin symbols";
+    grid-template-columns: minmax(0, 1fr) 72px;
+    grid-template-rows: auto auto auto auto minmax(120px, 1fr) auto;
+  }
+
   .panel--files {
     grid-area: files;
     min-height: 0;
@@ -911,9 +1101,11 @@ body {
 
   .file-resizer {
     background: var(--border);
+    background-clip: content-box;
     cursor: col-resize;
     display: block;
     height: 100%;
+    padding-inline: 2px;
     position: absolute;
     right: 0;
     top: 0;
@@ -923,6 +1115,7 @@ body {
   .file-resizer:hover,
   .file-resizer:focus-visible {
     background: var(--focus);
+    padding-inline: 1.5px;
   }
 
   .file-tree {
@@ -1063,9 +1256,9 @@ body {
    * FR-701 / FR-705 / BR-702 / FR-801: at ≥ 900 px, push #btn-symbols (and
    * the following #btn-theme + #btn-about) to the toolbar's inline-end edge.
    * Auto margin on the first of the cluster collects all free space on the
-   * flex line between #btn-files and #btn-symbols; below 900 px these rules
-   * do not apply so the row packs (and wraps) as today (FR-705). Logical
-   * property only — no margin-left/right or left/right (BR-702).
+   * flex line between #btn-output and #btn-symbols (FR-1313); below 900 px
+   * these rules do not apply so the row packs (and wraps) as today (FR-705).
+   * Logical property only — no margin-left/right or left/right (BR-702).
    *
    * `flex-wrap: nowrap` keeps the cluster on one line: with wrap, a tight
    * 900 px row (wider OS fonts) can fit #btn-symbols after the leading
@@ -1184,6 +1377,120 @@ body {
     grid-template-columns: minmax(160px, var(--files-width)) minmax(0, 58fr) minmax(0, 42fr) 72px;
   }
 
+  /* FR-1307: a committed `--output-width` replaces the 58 % / 42 fr default.
+     Unset (no data-output-sized) keeps FR-409. Hidden Output uses the
+     templates below, which have no output column. */
+  html[data-output-sized] #app[data-layout='vertical'] {
+    grid-template-columns: minmax(0, 1fr) var(--output-width);
+  }
+
+  html[data-output-sized] #app[data-layout='vertical']:has(#symbol-pane:not([hidden])) {
+    grid-template-columns: minmax(0, 1fr) var(--output-width) 72px;
+  }
+
+  html[data-output-sized] #app[data-layout='vertical']:has(#file-pane:not([hidden])) {
+    grid-template-columns: minmax(160px, var(--files-width)) minmax(0, 1fr) var(--output-width);
+  }
+
+  html[data-output-sized] #app[data-layout='vertical']:has(#file-pane:not([hidden])):has(#symbol-pane:not([hidden])) {
+    grid-template-columns: minmax(160px, var(--files-width)) minmax(0, 1fr) var(--output-width) 72px;
+  }
+
+  /* FR-1302 / FR-1304: vertical, Output hidden — editor (plus Files/Symbols)
+     takes the split. Stdin pending adds a full-width Input row under the
+     editor, not a skinny right column. */
+  html[data-output='hidden'] #app[data-layout='vertical'] {
+    grid-template-areas:
+      "toolbar"
+      "banner"
+      "status"
+      "notices"
+      "editor";
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto auto auto minmax(120px, 1fr);
+  }
+
+  html[data-output='hidden'] #app[data-layout='vertical']:has(#symbol-pane:not([hidden])) {
+    grid-template-areas:
+      "toolbar toolbar"
+      "banner  banner"
+      "status  status"
+      "notices notices"
+      "editor  symbols";
+    grid-template-columns: minmax(0, 1fr) 72px;
+    grid-template-rows: auto auto auto auto minmax(120px, 1fr);
+  }
+
+  html[data-output='hidden'] #app[data-layout='vertical']:has(#file-pane:not([hidden])) {
+    grid-template-areas:
+      "toolbar toolbar"
+      "banner  banner"
+      "status  status"
+      "notices notices"
+      "files   editor";
+    grid-template-columns: minmax(160px, var(--files-width)) minmax(0, 1fr);
+    grid-template-rows: auto auto auto auto minmax(120px, 1fr);
+  }
+
+  html[data-output='hidden'] #app[data-layout='vertical']:has(#file-pane:not([hidden])):has(#symbol-pane:not([hidden])) {
+    grid-template-areas:
+      "toolbar toolbar toolbar"
+      "banner  banner  banner"
+      "status  status  status"
+      "notices notices notices"
+      "files   editor  symbols";
+    grid-template-columns: minmax(160px, var(--files-width)) minmax(0, 1fr) 72px;
+    grid-template-rows: auto auto auto auto minmax(120px, 1fr);
+  }
+
+  html[data-output='hidden'] #app[data-layout='vertical'][data-stdin='pending'] {
+    grid-template-areas:
+      "toolbar"
+      "banner"
+      "status"
+      "notices"
+      "editor"
+      "stdin";
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto auto auto minmax(120px, 1fr) auto;
+  }
+
+  html[data-output='hidden'] #app[data-layout='vertical'][data-stdin='pending']:has(#symbol-pane:not([hidden])) {
+    grid-template-areas:
+      "toolbar toolbar"
+      "banner  banner"
+      "status  status"
+      "notices notices"
+      "editor  symbols"
+      "stdin   symbols";
+    grid-template-columns: minmax(0, 1fr) 72px;
+    grid-template-rows: auto auto auto auto minmax(120px, 1fr) auto;
+  }
+
+  html[data-output='hidden'] #app[data-layout='vertical'][data-stdin='pending']:has(#file-pane:not([hidden])) {
+    grid-template-areas:
+      "toolbar toolbar"
+      "banner  banner"
+      "status  status"
+      "notices notices"
+      "files   editor"
+      "files   stdin";
+    grid-template-columns: minmax(160px, var(--files-width)) minmax(0, 1fr);
+    grid-template-rows: auto auto auto auto minmax(120px, 1fr) auto;
+  }
+
+  html[data-output='hidden'] #app[data-layout='vertical'][data-stdin='pending']:has(#file-pane:not([hidden])):has(#symbol-pane:not([hidden])) {
+    grid-template-areas:
+      "toolbar toolbar toolbar"
+      "banner  banner  banner"
+      "status  status  status"
+      "notices notices notices"
+      "files   editor  symbols"
+      "files   stdin   symbols";
+    grid-template-columns: minmax(160px, var(--files-width)) minmax(0, 1fr) 72px;
+    grid-template-rows: auto auto auto auto minmax(120px, 1fr) auto;
+  }
+
   /*
    * FR-409 / FR-901: vertical diagnostics height is the `diag` track
    * (`--diagnostics-height` or content-sized auto), not the stacked layout's
@@ -1221,19 +1528,63 @@ body {
     order: 2;
   }
 
-  /* FR-903 / NFR-901: separator between console and stdin; ≥ 8 px hit target.
-     Resting/hover/focus mirror `.file-resizer` without coupling modules. */
+  /* FR-903 / NFR-901: 8 px hit target, 1 px resting hairline (content-box clip).
+     Hover/focus thicken to 2 px and use --focus. */
   #app[data-layout='vertical'] .diag-resizer {
     background: var(--border);
+    background-clip: content-box;
     cursor: row-resize;
     display: block;
     min-height: 8px;
     outline-offset: 2px;
+    padding-block: 3.5px;
   }
 
   #app[data-layout='vertical'] .diag-resizer:hover,
   #app[data-layout='vertical'] .diag-resizer:focus-visible {
     background: var(--focus);
+    padding-block: 3px;
+  }
+
+  /* FR-1305 / BR-1302 / NFR-1303: overlay on the output column's inline-start
+     edge, spanning console → diagnostics. `grid-column: console` tracks Files
+     and Symbols without adding a track that would insert another 8 px gap.
+     The 8 px width is the hit target; only the 1 px content-box paints. */
+  #app[data-layout='vertical'] .output-resizer {
+    background: var(--border);
+    background-clip: content-box;
+    cursor: col-resize;
+    display: block;
+    grid-column: console;
+    grid-row: console / span 4;
+    justify-self: start;
+    margin-inline-start: -8px;
+    min-width: 8px;
+    outline-offset: 2px;
+    padding-inline: 3.5px;
+    width: 8px;
+    z-index: 2;
+  }
+
+  #app[data-layout='vertical'] .output-resizer:hover,
+  #app[data-layout='vertical'] .output-resizer:focus-visible {
+    background: var(--focus);
+    padding-inline: 3px;
+  }
+
+  /* FR-1302 / BR-1307: the vertical `display: block` rules above beat the
+     unscoped `html[data-output=hidden] .output-resizer { display: none }`
+     (id vs element). Re-hide both separators when Output is hidden. */
+  html[data-output='hidden'] #app[data-layout='vertical'] .diag-resizer,
+  html[data-output='hidden'] #app[data-layout='vertical'] .output-resizer,
+  html[data-output='hidden'] #app[data-layout='vertical'] .panel--console,
+  html[data-output='hidden'] #app[data-layout='vertical'] .panel--diagnostics,
+  html[data-output='hidden'] #app[data-layout='vertical'] .panel--stdin {
+    display: none;
+  }
+
+  html[data-output='hidden'] #app[data-layout='vertical'][data-stdin='pending'] .panel--stdin {
+    display: block;
   }
 
   /* The two panels' flex ratios are the stacked column's; as grid items they

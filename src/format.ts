@@ -92,6 +92,24 @@ export const DIAG_RESIZER_LABEL = 'Resize diagnostics panel';
 /** FR-912: the height preference write was rejected. */
 export const DIAG_HEIGHT_SAVE_FAILED = "Diagnostics height won't be remembered";
 
+/** FR-1301: `#btn-output` visible label and accessible name. */
+export const OUTPUT_LABEL = 'Output';
+
+/** FR-1305: `#output-resizer` accessible name. */
+export const OUTPUT_RESIZER_LABEL = 'Resize output pane';
+
+/** FR-1314: `#console-resizer` accessible name (stacked layout). */
+export const CONSOLE_RESIZER_LABEL = 'Resize console panel';
+
+/** FR-1315: the console-height preference write was rejected. */
+export const CONSOLE_HEIGHT_SAVE_FAILED = "Console height won't be remembered";
+
+/** FR-1310: the visibility preference write was rejected. */
+export const OUTPUT_VISIBLE_SAVE_FAILED = "Output layout won't be remembered";
+
+/** FR-1310: the width preference write was rejected. */
+export const OUTPUT_WIDTH_SAVE_FAILED = "Output width won't be remembered";
+
 /** Mode table labels (FR-504): tooltip and accessible-name suffix. */
 export const THEME_LABELS = {
   light: 'Light',

@@ -234,10 +234,15 @@ test('VC-902 (FR-903, FR-913): separator between console and stdin with ARIA con
 
   const order = await page.evaluate(() =>
     Array.from(document.getElementById('app')!.children)
-      .filter((el) => el.classList.contains('panel') || el.id === 'diag-resizer')
+      .filter(
+        (el) =>
+          el.classList.contains('panel') ||
+          el.id === 'diag-resizer' ||
+          el.id === 'output-resizer',
+      )
       .map((el) =>
-        el.id === 'diag-resizer'
-          ? 'diag-resizer'
+        el.id === 'diag-resizer' || el.id === 'output-resizer'
+          ? el.id
           : (el.getAttribute('aria-label') ?? el.className),
       ),
   );
@@ -245,6 +250,7 @@ test('VC-902 (FR-903, FR-913): separator between console and stdin with ARIA con
     'Special characters',
     'Console',
     'Editor',
+    'output-resizer',
     'diag-resizer',
     'Standard input',
     'Diagnostics',
@@ -332,31 +338,19 @@ test('VC-905 (FR-905): ArrowUp/Down steps are 16 px, Shift 48 px', async ({ page
   expect(Number(await resizer.getAttribute('aria-valuenow'))).toBe(start);
 });
 
-test('VC-906 (FR-906, BR-904): resizer inert in horizontal and at 375 px', async ({ page }) => {
+test('VC-906 (FR-906): Problems resizer is available in stacked layout', async ({ page }) => {
   await seedStorage(page, { layout: 'horizontal', diagHeight: null });
   await openPlayground(page, { seedLayout: false });
   await waitForPythonReady(page);
   await waitForLinter(page);
 
   const resizer = page.locator('#diag-resizer');
-  await expect(resizer).toBeHidden();
-  await expect(resizer).toHaveAttribute('aria-disabled', 'true');
+  await expect(resizer).toBeVisible();
+  await expect(resizer).toHaveAttribute('aria-disabled', 'false');
   const maxH = await page.evaluate(
     () => getComputedStyle(document.querySelector('.panel--diagnostics')!).maxHeight,
   );
   expect(maxH).toMatch(/vh|px/);
-  // Force-focus and activate: heights must not change.
-  const before = await page.evaluate(() => ({
-    now: document.getElementById('diag-resizer')!.getAttribute('aria-valuenow'),
-    css: document.documentElement.style.getPropertyValue('--diagnostics-height'),
-  }));
-  await page.evaluate(() => document.getElementById('diag-resizer')!.focus());
-  await page.keyboard.press('ArrowUp');
-  const after = await page.evaluate(() => ({
-    now: document.getElementById('diag-resizer')!.getAttribute('aria-valuenow'),
-    css: document.documentElement.style.getPropertyValue('--diagnostics-height'),
-  }));
-  expect(after).toEqual(before);
 
   await page.setViewportSize(NARROW_PHONE);
   await page.evaluate((key) => window.localStorage.setItem(key, 'vertical'), LAYOUT_KEY);
@@ -366,8 +360,7 @@ test('VC-906 (FR-906, BR-904): resizer inert in horizontal and at 375 px', async
   await expect
     .poll(() => page.evaluate(() => document.getElementById('app')?.dataset.layout))
     .toBe('horizontal');
-  await expect(page.locator('#diag-resizer')).toBeHidden();
-  await expect(page.locator('#diag-resizer')).toHaveAttribute('aria-disabled', 'true');
+  await expect(page.locator('#diag-resizer')).toBeVisible();
 });
 test('VC-907 (FR-909, FR-910): mid-range height restores on reload', async ({ page }) => {
   await openVertical(page, null);
@@ -554,22 +547,15 @@ test('VC-913 (end-to-end): enlarge, persist, layout and viewport round-trip', as
     .toBe(restored);
 
   await page.click('#layout-horizontal');
-  await expect(page.locator('#diag-resizer')).toBeHidden();
-  const maxH = await page.evaluate(
-    () => getComputedStyle(document.querySelector('.panel--diagnostics')!).maxHeight,
-  );
-  expect(parseFloat(maxH)).toBeCloseTo(
-    (await page.evaluate(() => window.innerHeight)) * 0.25,
-    0,
-  );
+  await expect(page.locator('#diag-resizer')).toBeVisible();
+  expect(Number(await page.locator('#diag-resizer').getAttribute('aria-valuenow'))).toBe(restored);
 
   await page.click('#layout-vertical');
   await expect(page.locator('#diag-resizer')).toBeVisible();
   expect(Number(await page.locator('#diag-resizer').getAttribute('aria-valuenow'))).toBe(restored);
 
   await page.setViewportSize({ width: 800, height: 700 });
-  await expect(page.locator('#diag-resizer')).toBeHidden();
-  await expect(page.locator('#diag-resizer')).toHaveAttribute('aria-disabled', 'true');
+  await expect(page.locator('#diag-resizer')).toBeVisible();
 
   await page.setViewportSize(WIDE);
   await expect(page.locator('#diag-resizer')).toBeVisible();

@@ -42,6 +42,33 @@
               '--diagnostics-height',
               raw + 'px',
             );
+            document.documentElement.dataset.diagSized = '';
+          }
+        } catch (e) {}
+      })();
+    </script>
+    <!-- FR-1311: apply stored Output visibility and column width before CSS
+         paint so a restored `hidden` never flashes the console column and a
+         restored width never flashes FR-409's 58 % split. Regex matches
+         src/output-pane.ts isCanonicalOutputWidth. -->
+    <script>
+      (function () {
+        try {
+          var visible = localStorage.getItem('pyplay.output-visible.v1');
+          if (visible === 'hidden') document.documentElement.dataset.output = 'hidden';
+        } catch (e) {}
+        try {
+          var raw = localStorage.getItem('pyplay.output-width.v1');
+          if (raw && /^[1-9][0-9]*$/.test(raw)) {
+            document.documentElement.style.setProperty('--output-width', raw + 'px');
+            document.documentElement.dataset.outputSized = '';
+          }
+        } catch (e) {}
+        try {
+          var ch = localStorage.getItem('pyplay.console-height.v1');
+          if (ch && /^[1-9][0-9]*$/.test(ch)) {
+            document.documentElement.style.setProperty('--console-height', ch + 'px');
+            document.documentElement.dataset.consoleSized = '';
           }
         } catch (e) {}
       })();
@@ -99,6 +126,16 @@
              force and clears it again on the way back up. -->
         <span id="layout-narrow-hint" class="visually-hidden"></span>
         <button id="btn-files" class="btn" type="button" aria-expanded="false" aria-controls="file-pane">Files</button>
+        <!-- FR-1301: immediately after Files, still in the leading cluster.
+             aria-expanded mirrors the hide/show preference, not a pending
+             stdin exception (FR-1303). Never routed through setInert(). -->
+        <button
+          id="btn-output"
+          class="btn"
+          type="button"
+          aria-expanded="true"
+          aria-controls="console-pane stdin-pane diagnostics-pane"
+        >Output</button>
         <!-- FR-301: immediately before the color-mode control. It has no
              disabled state, so unlike Run/Stop/Format it is never routed
              through `setInert()`. -->
@@ -142,14 +179,43 @@
         <p id="symbol-status" class="symbol-status" role="status"></p>
       </section>
 
-      <section class="panel panel--console" aria-label="Console">
+      <section id="console-pane" class="panel panel--console" aria-label="Console">
         <div id="console" class="console"></div>
+        <!-- FR-1314: stacked-layout height handle, inside the panel like
+             `#file-resizer`. Hidden + setInert outside horizontal. -->
+        <div
+          id="console-resizer"
+          class="console-resizer"
+          role="separator"
+          aria-orientation="horizontal"
+          aria-label="Resize console panel"
+          aria-valuemin="80"
+          aria-valuemax="80"
+          aria-valuenow="80"
+          tabindex="0"
+        ></div>
       </section>
 
       <section class="panel panel--editor" aria-label="Editor">
         <h2 class="editor-heading">Editing: <span id="active-file-name">main.py</span></h2>
         <div id="editor" class="editor"></div>
       </section>
+
+      <!-- FR-1305: overlay separator on the output column's inline-start edge.
+           Non-panel sibling immediately after the editor, before #diag-resizer.
+           Visible only in vertical ≥ 900 px with Output shown; mountOutputPane
+           applies setInert. Not a grid track (BR-1302). -->
+      <div
+        id="output-resizer"
+        class="output-resizer"
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize output pane"
+        aria-valuemin="240"
+        aria-valuemax="240"
+        aria-valuenow="240"
+        tabindex="0"
+      ></div>
 
       <!-- FR-913: non-panel sibling immediately after the editor, before stdin.
            Visible only in vertical ≥ 900 px (CSS + hidden); mountDiagResizer
@@ -167,7 +233,7 @@
         tabindex="0"
       ></div>
 
-      <section class="panel panel--stdin" aria-label="Standard input">
+      <section id="stdin-pane" class="panel panel--stdin" aria-label="Standard input">
         <label class="stdin-label" for="stdin-input">Input</label>
         <input
           id="stdin-input"
@@ -182,7 +248,7 @@
         <button id="btn-eof" class="btn" type="button" tabindex="0" aria-disabled="true">Send EOF</button>
       </section>
 
-      <section class="panel panel--diagnostics" aria-label="Diagnostics">
+      <section id="diagnostics-pane" class="panel panel--diagnostics" aria-label="Diagnostics">
         <h2 class="panel-title">
           Problems <span id="diagnostics-count" class="count">0</span>
         </h2>

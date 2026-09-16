@@ -24,11 +24,13 @@ import {
   formatRunSeparator,
   LAYOUT_NARROW_HINT,
   LAYOUT_SAVE_FAILED,
+  OUTPUT_LABEL,
   RUN_LABEL,
   RUNNING_LABEL,
   RUN_PYTHON_FILE_LABEL,
 } from './format';
 import { mountDiagResizer } from './diag-resize';
+import { mountOutputPane } from './output-pane';
 import { CANNOT_FORMAT, formatDocument } from './lint/format-command';
 import { Linter } from './lint/linter';
 import { applyDiagnostics } from './lint/markers';
@@ -108,8 +110,9 @@ function boot(): void {
   let layoutPref = loadLayoutPreference(storage);
   // FR-418: at most one notice per page load.
   let layoutSaveWarned = false;
-  // Assigned after `renderLayout` is defined; sync is invoked from there (FR-903).
+  // Assigned after `renderLayout` is defined; sync is invoked from there (FR-903 / FR-1308).
   let diagResizer: ReturnType<typeof mountDiagResizer> | null = null;
+  let outputPane: ReturnType<typeof mountOutputPane> | null = null;
 
   /**
    * Render the effective layout: the `data-layout` attribute, the control's
@@ -156,14 +159,33 @@ function boot(): void {
     // FR-903 / FR-906 / FR-908: refresh separator inertness, aria bounds, and
     // in-memory clamp whenever effective layout or the 900 px mask changes.
     diagResizer?.sync();
+    // FR-1305 / FR-1308: output-column separator follows the same layout mask.
+    outputPane?.sync();
   };
 
   // FR-903 – FR-912: diagnostics ↔ console separator (vertical ≥ 900 only).
   diagResizer = mountDiagResizer({
     app,
     resizer: need('diag-resizer'),
-    diagnostics: need('diagnostics-list').closest('.panel--diagnostics')!,
-    consolePanel: need('console').closest('.panel--console')!,
+    diagnostics: need('diagnostics-pane'),
+    consolePanel: need('console-pane'),
+    storage,
+    notices,
+    getEffectiveLayout: () =>
+      resolveLayout(layoutPref, wide.matches ? LAYOUT_MIN_WIDTH : 0),
+  });
+
+  // FR-1301 – FR-1312: Output toggle + vertical editor/output separator.
+  const outputToggle = need<HTMLButtonElement>('btn-output');
+  outputToggle.textContent = OUTPUT_LABEL;
+  outputPane = mountOutputPane({
+    app,
+    toggle: outputToggle,
+    consolePane: need('console-pane'),
+    stdinPane: need('stdin-pane'),
+    diagnosticsPane: need('diagnostics-pane'),
+    resizer: need('output-resizer'),
+    consoleResizer: need('console-resizer'),
     storage,
     notices,
     getEffectiveLayout: () =>
@@ -579,6 +601,8 @@ function boot(): void {
     stdinMode = mode;
     setInert(stdinInput, false);
     setInert(eofBtn, false);
+    // FR-1303: reveal Input even when Output is hidden, then focus (FR-029).
+    outputPane?.setStdinPending(true);
     stdinInput.focus();
   }
 
@@ -588,6 +612,7 @@ function boot(): void {
     stdinInput.value = '';
     setInert(stdinInput, true);
     setInert(eofBtn, true);
+    outputPane?.setStdinPending(false);
   }
 
   function submitStdin(): void {

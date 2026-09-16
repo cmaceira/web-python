@@ -73,13 +73,17 @@ test('VC-608 / VC-1103 (FR-606, FR-1103): completion Tab and Tab-focus mode use 
   await expect(page.locator('.cm-content')).toBeFocused();
 
   // Issue #31: Tab now indents. CodeMirror's built-in focus mode leaves the
-  // editor for sequential navigation. Vertical ≥ 900 inserts `#diag-resizer`
-  // between editor and stdin (FR-913); stacked / narrow skip it.
+  // editor for sequential navigation. Vertical ≥ 900 inserts `#output-resizer`
+  // then `#diag-resizer` between editor and stdin (FR-1305 / FR-913).
   await page.keyboard.press('Control+m');
   await page.keyboard.press('Tab');
-  const layout = await page.locator('#app').getAttribute('data-layout');
+  const outputResizerVisible = await page.locator('#output-resizer').isVisible();
   const diagResizerVisible = await page.locator('#diag-resizer').isVisible();
-  if (layout === 'vertical' && diagResizerVisible) {
+  if (outputResizerVisible) {
+    await expect(page.locator('#output-resizer')).toBeFocused();
+    await page.keyboard.press('Tab');
+  }
+  if (diagResizerVisible) {
     await expect(page.locator('#diag-resizer')).toBeFocused();
     await page.keyboard.press('Tab');
   }

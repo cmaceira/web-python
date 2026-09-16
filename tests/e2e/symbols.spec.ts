@@ -892,8 +892,8 @@ test.describe('wide layout keyboard model', () => {
     await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
 
     const visited: string[] = [];
-    // About (+1) and optional `#diag-resizer` under vertical (≥900) need headroom.
-    const tabBudget = 21;
+    // About, Output, and optional separators under vertical (≥900) need headroom.
+    const tabBudget = 28;
     for (let i = 0; i < tabBudget; i++) {
       await page.keyboard.press('Tab');
       const target = await page.evaluate(() => {
@@ -919,12 +919,15 @@ test.describe('wide layout keyboard model', () => {
     // `syncLayout`); its own DOM position (after Diagnostics, per FR-317 and
     // FR-410's fixed runs) puts its tab stops after the editor/stdin group.
     // Vertical ≥ 900 inserts `#diag-resizer` between editor and stdin (FR-913).
-    const layout = await page.locator('#app').getAttribute('data-layout');
     const diagResizerVisible = await page.locator('#diag-resizer').isVisible();
-    const afterEditor =
-      layout === 'vertical' && diagResizerVisible
-        ? (['#diag-resizer', '#stdin-input', '#btn-eof'] as const)
-        : (['#stdin-input', '#btn-eof'] as const);
+    const outputResizerVisible = await page.locator('#output-resizer').isVisible();
+    const consoleResizerVisible = await page.locator('#console-resizer').isVisible();
+    const afterEditor = [
+      ...(outputResizerVisible ? (['#output-resizer'] as const) : []),
+      ...(diagResizerVisible ? (['#diag-resizer'] as const) : []),
+      '#stdin-input',
+      '#btn-eof',
+    ];
     const expected = [
       '#btn-run',
       '#btn-stop',
@@ -935,11 +938,13 @@ test.describe('wide layout keyboard model', () => {
       // spec-04 FR-401: immediately after `Reset`, before `Symbols`.
       'layout',
       '#btn-files',
+      '#btn-output',
       '#btn-symbols',
       '#btn-theme',
       // spec-08 FR-801: About is last toolbar control after theme.
       '#btn-about',
       'pane',
+      ...(consoleResizerVisible ? (['#console-resizer'] as const) : []),
       'editor',
       ...afterEditor,
       '#btn-file-new',

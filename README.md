@@ -23,13 +23,14 @@ Everything runs in the visitor's own browser:
 | Offline + isolation | A **single** service worker that both injects COOP/COEP and precaches every asset the Run loop needs |
 | Special characters | A dismissible pane of 29 Python-relevant characters that copies one at a time to the clipboard, for keyboards where `[`, `]`, `{`, `}`, `\` and `|` are hard to reach |
 | Color mode | A toolbar control that cycles Light → Dark → System; System follows the OS preference sampled once per page load. The choice persists under `pyplay.theme.v1` |
+| Output pane | A toolbar toggle hides or shows Console + Input + Problems together. In the two-column layout a separator resizes that column against the editor. Both persist under `pyplay.output-visible.v1` and `pyplay.output-width.v1` |
 | Build | Vite → a directory of static files (`dist/`) deployable to any static host |
 
 There is **no server** and no cloud sync. The site issues no request to any
 origin but its own, and the visitor's workspace is never transmitted anywhere.
 It lives in the editor, the Web Worker, and `localStorage` on this origin
-(`pyplay.workspace.v1`, plus the `pyplay.theme.v1` color-mode preference). The
-workspace starts with `main.py`, permits a small flat set of files (including
+(`pyplay.workspace.v1`, plus `pyplay.theme.v1`, `pyplay.output-visible.v1`, and
+`pyplay.output-width.v1`). The workspace starts with `main.py`, permits a small flat set of files (including
 importable `.py` modules), accepts Python-created text or binary files, and is
 limited to 2 MB for classroom exercises.
 
@@ -41,6 +42,7 @@ limited to 2 MB for classroom exercises.
 - Python paste sanitisation: [`specs/10-paste-sanitisation-frozen.md`](specs/10-paste-sanitisation-frozen.md)
 - Python Tab indentation: [`specs/11-tab-indentation-frozen.md`](specs/11-tab-indentation-frozen.md)
 - Auto-closing brackets and quotes: [`specs/12-auto-close-brackets-frozen.md`](specs/12-auto-close-brackets-frozen.md)
+- Output pane hide/resize: [`specs/13-output-pane-frozen.md`](specs/13-output-pane-frozen.md)
 - Deploying it: [`docs/deployment.md`](docs/deployment.md)
 - How it works inside: [`docs/architecture.md`](docs/architecture.md)
 - Working on it: [`CONTRIBUTING.md`](CONTRIBUTING.md)

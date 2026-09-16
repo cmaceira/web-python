@@ -42,6 +42,8 @@ const CONTROLS = [
   // three preference states are exercised by VC-427.
   '#layout-vertical',
   '#layout-horizontal',
+  '#btn-files',
+  '#btn-output',
   // spec-03 FR-301: the pane's toggle is a toolbar control like any other.
   '#btn-symbols',
   // spec-05 FR-501: color-mode control after Symbols.
@@ -163,6 +165,7 @@ async function paintEverySurface(page: Page): Promise<void> {
     .poll(() => page.evaluate(() => document.getElementById('app')?.dataset.layout))
     .toBe('vertical');
   await expect(page.locator('#diag-resizer')).toBeVisible();
+  await expect(page.locator('#output-resizer')).toBeVisible();
 
   await runProgram(
     page,
@@ -376,6 +379,17 @@ const NON_TEXT_SAMPLES: Sample[] = [
     prop: 'outlineColor',
     focus: true,
   },
+  {
+    label: 'output-resizer resting',
+    selector: '#output-resizer',
+    prop: 'backgroundColor',
+  },
+  {
+    label: 'focus ring (output-resizer)',
+    selector: '#output-resizer',
+    prop: 'outlineColor',
+    focus: true,
+  },
   // spec-08 NFR-803: About control focus ring (dialog chrome sampled after open).
   {
     label: 'focus ring (about)',
@@ -504,11 +518,22 @@ for (const scheme of ['light', 'dark'] as const) {
         ])),
       );
 
+      await page.locator('#output-resizer').hover();
+      measured.push(
+        ...(await measureContrast(page, [
+          {
+            label: 'output-resizer hover',
+            selector: '#output-resizer',
+            prop: 'backgroundColor',
+          },
+        ])),
+      );
+
       // spec-08 VC-815: dialog border / backdrop / Close ring with modal open.
       await openAboutDialog(page);
       measured.push(...(await measureContrast(page, ABOUT_NON_TEXT_SAMPLES)));
 
-      expect(measured).toHaveLength(NON_TEXT_SAMPLES.length + 4 + ABOUT_NON_TEXT_SAMPLES.length);
+      expect(measured).toHaveLength(NON_TEXT_SAMPLES.length + 5 + ABOUT_NON_TEXT_SAMPLES.length);
       expect(failures(measured, 3)).toEqual([]);
     });
   });
@@ -760,6 +785,8 @@ test('VC-052 (FR-049): Tab reaches every target, each with a visible ring', asyn
     '#btn-format',
     '#btn-reset',
     '#layout-group',
+    '#btn-files',
+    '#btn-output',
     '#btn-symbols',
     '#btn-theme',
     '#btn-about',

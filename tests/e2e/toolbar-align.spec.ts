@@ -5,8 +5,8 @@
  *
  * VC-701 (FR-701, amended) — #btn-about flush with toolbar content-box inline-end.
  * VC-702 (FR-702) — Symbols/theme gap is 6 ± 1 px; nothing between them.
- * VC-703 (FR-703, FR-706) — one oversized gap, between Files and Symbols.
- * VC-704 (FR-704, BR-701, amended) — Tab order is the eleven-stop sequence
+ * VC-703 (FR-703, FR-706, FR-1313) — one oversized gap, between Output and Symbols.
+ * VC-704 (FR-704, BR-701, amended) — Tab order is the twelve-stop sequence
  *   through `#btn-about`.
  * VC-705 (FR-705) — below 900 px no auto-margin; at 900 px VC-701 holds.
  * VC-707 (BR-703) — Symbols / theme still work from the new position.
@@ -33,6 +33,7 @@ const TOOLBAR_CONTROL_IDS = [
   'btn-reset',
   'layout-group',
   'btn-files',
+  'btn-output',
   'btn-symbols',
   'btn-theme',
   'btn-about',
@@ -48,6 +49,7 @@ const FR704_STOPS = [
   'btn-reset',
   'layout-group',
   'btn-files',
+  'btn-output',
   'btn-symbols',
   'btn-theme',
   'btn-about',
@@ -254,7 +256,7 @@ test('VC-702 (FR-702): Symbols/theme gap is 6 ± 1 px with nothing between', asy
    VC-703 (FR-703, FR-706)
    ------------------------------------------------------------------------- */
 
-test('VC-703 (FR-703, FR-706): exactly one oversized gap, between Files and Symbols', async ({
+test('VC-703 (FR-703, FR-706, FR-1313): exactly one oversized gap, between Output and Symbols', async ({
   page,
 }) => {
   await page.setViewportSize(WIDE);
@@ -270,7 +272,7 @@ test('VC-703 (FR-703, FR-706): exactly one oversized gap, between Files and Symb
     oversized,
     `gaps: ${gaps.map((g) => `${g.from}→${g.to}=${g.gap.toFixed(1)}`).join(', ')}`,
   ).toHaveLength(1);
-  expect(oversized[0]!.from).toBe('btn-files');
+  expect(oversized[0]!.from).toBe('btn-output');
   expect(oversized[0]!.to).toBe('btn-symbols');
   expect(oversized[0]!.gap).toBeGreaterThan(7);
 });
@@ -284,7 +286,7 @@ for (const layout of ['horizontal', 'vertical'] as const) {
     { theme: 'light', colorScheme: 'light' as const, effective: 'light' },
     { theme: 'dark', colorScheme: 'dark' as const, effective: 'dark' },
   ]) {
-    test(`VC-704 (FR-704): Tab eleven stops ${layout} / effective ${palette.effective}`, async ({
+    test(`VC-704 (FR-704): Tab twelve stops ${layout} / effective ${palette.effective}`, async ({
       page,
     }) => {
       await page.emulateMedia({ colorScheme: palette.colorScheme });
