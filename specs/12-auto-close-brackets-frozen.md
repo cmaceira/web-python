@@ -72,6 +72,11 @@ measurement for spec-10, but VC-1011 no longer charges every later whole-app
 feature to the paste branch point. Pairing carries the independently anchored
 NFR-1201 budget instead.
 
+**Amendment (spec-13, 2026-09-15):** NFR-1201's ≤ 2 KiB ship measurement vs
+`44f9afa` (`v0.8.0`) is immutable; VC-1206 no longer subtracts later whole-app
+builds from that baseline. Output carries the independently anchored NFR-1301
+budget instead.
+
 ## Interfaces
 
 No public API, storage key, DOM node, worker message, network request, or

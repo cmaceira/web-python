@@ -477,61 +477,45 @@ html[data-output='hidden'] #app[data-stdin='pending'] .panel--stdin {
   inline-size: 3ch;
 }
 
-.file-resizer {
-  display: none;
-}
-
-/* FR-1305: overlay; shown only in vertical ≥ 900 with Output visible. */
-.output-resizer {
-  display: none;
-}
-
+.file-resizer,
+.output-resizer,
 .console-resizer {
   display: none;
 }
 
 /* FR-1314: stacked console/problems height handles. 8 px hit, 1 px hairline. */
-#app:not([data-layout='vertical']) .console-resizer {
-  background: var(--border);
-  background-clip: content-box;
-  bottom: 0;
-  cursor: row-resize;
-  display: block;
-  height: 8px;
-  left: 0;
-  outline-offset: 2px;
-  padding-block: 3.5px;
-  position: absolute;
-  right: 0;
-  z-index: 2;
-}
-
-#app:not([data-layout='vertical']) .console-resizer:hover,
-#app:not([data-layout='vertical']) .console-resizer:focus-visible {
-  background: var(--focus);
-  padding-block: 3px;
-}
-
-#app:not([data-layout='vertical']) .console-resizer[hidden] {
-  display: none;
-}
-
+#app:not([data-layout='vertical']) .console-resizer,
 #app:not([data-layout='vertical']) .diag-resizer {
   background: var(--border);
   background-clip: content-box;
   cursor: row-resize;
   display: block;
-  min-height: 8px;
   outline-offset: 2px;
   padding-block: 3.5px;
 }
 
+#app:not([data-layout='vertical']) .console-resizer {
+  bottom: 0;
+  height: 8px;
+  left: 0;
+  position: absolute;
+  right: 0;
+  z-index: 2;
+}
+
+#app:not([data-layout='vertical']) .diag-resizer {
+  min-height: 8px;
+}
+
+#app:not([data-layout='vertical']) .console-resizer:hover,
+#app:not([data-layout='vertical']) .console-resizer:focus-visible,
 #app:not([data-layout='vertical']) .diag-resizer:hover,
 #app:not([data-layout='vertical']) .diag-resizer:focus-visible {
   background: var(--focus);
   padding-block: 3px;
 }
 
+#app:not([data-layout='vertical']) .console-resizer[hidden],
 #app:not([data-layout='vertical']) .diag-resizer[hidden],
 html[data-output='hidden'] #app:not([data-layout='vertical']) .diag-resizer {
   display: none;
@@ -1017,7 +1001,9 @@ html[data-diag-sized] #app:not([data-layout='vertical']) .panel--diagnostics {
   }
 
   /* FR-1302 / FR-1304: stacked + Files, Output hidden — drop console/stdin/diag
-     rows so the leftover `minmax(80px, 1fr)` console track cannot sit empty. */
+     rows so the leftover `minmax(80px, 1fr)` console track cannot sit empty.
+     Area maps (not 0-height tracks) so `.app { gap: 8px }` does not keep a
+     gap around a collapsed row. */
   html[data-output='hidden'] .app:not([data-layout='vertical']):has(#file-pane:not([hidden])) {
     grid-template-areas:
       "toolbar toolbar"
@@ -1397,8 +1383,9 @@ html[data-diag-sized] #app:not([data-layout='vertical']) .panel--diagnostics {
   }
 
   /* FR-1302 / FR-1304: vertical, Output hidden — editor (plus Files/Symbols)
-     takes the split. Stdin pending adds a full-width Input row under the
-     editor, not a skinny right column. */
+     takes the split. Area maps drop the output column so `.app { gap: 8px }`
+     does not keep a gap beside a 0-width track. Stdin pending adds a
+     full-width Input row under the editor, not a skinny right column. */
   html[data-output='hidden'] #app[data-layout='vertical'] {
     grid-template-areas:
       "toolbar"

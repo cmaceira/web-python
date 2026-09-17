@@ -133,7 +133,8 @@ Records pin what a build is compared against:
 | `tests/e2e/baseline-build-about.json` | VC-814 (NFR-805, ≤ 4 KB) | `e569b81` |
 | `tests/e2e/baseline-build-diag-resize.json` | VC-912 (NFR-904, ≤ 2 KB) | `562cb27` |
 | `tests/e2e/baseline-build-paste.json` | VC-1011 (NFR-1001 size historical) | `2eb0bd4` |
-| `tests/e2e/baseline-build-brackets.json` | VC-1206 (NFR-1201, ≤ 2 KiB) | `44f9afa` |
+| `tests/e2e/baseline-build-brackets.json` | VC-1206 (NFR-1201 size historical) | `44f9afa` |
+| `tests/e2e/baseline-build-output.json` | VC-1314 (NFR-1301, ≤ 3 KiB) | `6ab5936` |
 | `tests/e2e/baseline-build-theme.json` | VC-513 (spec-05, shape / latency) | `0a4194f` |
 | `tests/e2e/baseline-geometry.json` | VC-408 (spec-04, ±1 px) | `384cb70` |
 
@@ -154,7 +155,7 @@ environments reports the environment as a regression:
 
 So `pr.yml` builds the pinned commits on the runner and records its own before
 each suite, pointing `PYPLAY_BASELINE_GEOMETRY`, `PYPLAY_BASELINE_BUILD`, and
-`PYPLAY_BASELINE_BRACKETS` at them. The committed records are the fallback
+`PYPLAY_BASELINE_OUTPUT` at them. The committed records are the fallback
 for a local run: a geometry record names the environment it was made on and
 the size records are keyed by compressor, and a run matching neither **skips**
 rather than reporting a pass it did not earn.
@@ -166,6 +167,7 @@ node scripts/record-baselines.mjs 384cb70 --geometry tests/e2e/baseline-geometry
 node scripts/record-baselines.mjs 3efb8be --build    tests/e2e/baseline-build-completion.json
 node scripts/record-baselines.mjs 562cb27 --build    tests/e2e/baseline-build-diag-resize.json
 node scripts/record-baselines.mjs 44f9afa --build    tests/e2e/baseline-build-brackets.json
+node scripts/record-baselines.mjs 6ab5936 --build    tests/e2e/baseline-build-output.json
 ```
 
 Commit the result only when it is your own environment's record of a commit

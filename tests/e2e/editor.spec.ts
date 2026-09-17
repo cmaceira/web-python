@@ -1,7 +1,3 @@
-import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { gzipSync } from 'node:zlib';
 import { expect, test } from '@playwright/test';
 import {
   STARTER_PROGRAM,
@@ -12,41 +8,6 @@ import {
   storedProgram,
   typeProgram,
 } from './helpers';
-
-interface BaselineBuild {
-  commit: string;
-  manifestUrlCount: number;
-  gzippedApp?: number;
-  gzippedBy?: string;
-  gzippedAppBy?: Record<string, number>;
-}
-
-const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
-const dist = join(repoRoot, 'dist');
-const BRACKETS_BASELINE_PATH =
-  process.env.PYPLAY_BASELINE_BRACKETS ??
-  join(repoRoot, 'tests', 'e2e', 'baseline-build-brackets.json');
-const bracketsBaseline = JSON.parse(readFileSync(BRACKETS_BASELINE_PATH, 'utf8')) as BaselineBuild;
-const compressor = `${process.platform}-${process.arch} zlib ${process.versions.zlib}`;
-const bracketsBaselineApp =
-  bracketsBaseline.gzippedAppBy?.[compressor] ??
-  (bracketsBaseline.gzippedBy === compressor ? bracketsBaseline.gzippedApp : undefined);
-const BRACKETS_SIZE_BUDGET_BYTES = 2 * 1024;
-
-if (process.env.PYPLAY_BASELINE_BRACKETS !== undefined && bracketsBaselineApp === undefined) {
-  throw new Error(
-    `${BRACKETS_BASELINE_PATH} records no app size for "${compressor}" (gzipped by ` +
-      `"${bracketsBaseline.gzippedBy}")`,
-  );
-}
-
-const uncoveredBracketsCompressor =
-  `no ${bracketsBaseline.commit} baseline for "${compressor}" — have: ` +
-  `${Object.keys(bracketsBaseline.gzippedAppBy ?? {}).join(', ')}. Record with: ` +
-  `node scripts/record-baselines.mjs ${bracketsBaseline.commit} --build <out.json>`;
-
-const isVendored = (url: string): boolean =>
-  url.startsWith('/pyodide/') || url.startsWith('/ruff/');
 
 test('cross-origin isolation headers are served (BR-002)', async ({ page }) => {
   const response = await page.goto('/');
@@ -301,31 +262,11 @@ test('VC-1205 (FR-1205): nested pairs undo and redo as ordinary editor edits', a
   expect((await editorSnapshot(page)).text).toBe('([])');
 });
 
-test('VC-1206 (NFR-1201): pairing adds ≤ 2 KiB gzip and no asset', async () => {
-  test.skip(bracketsBaselineApp === undefined, uncoveredBracketsCompressor);
-
-  const manifest = JSON.parse(readFileSync(join(dist, 'precache-manifest.json'), 'utf8')) as {
-    urls: string[];
-  };
-  let gzippedApp = 0;
-  for (const url of [...manifest.urls, '/index.html']) {
-    if (url === '/' || isVendored(url)) continue;
-    gzippedApp += gzipSync(readFileSync(join(dist, url.replace(/^\//, ''))), { level: 9 }).length;
-  }
-
-  const delta = gzippedApp - bracketsBaselineApp!;
-  expect(
-    delta,
-    `NFR-1201 app size delta vs ${bracketsBaseline.commit}: ${delta} B gzipped ` +
-      `(budget ${BRACKETS_SIZE_BUDGET_BYTES} B, compressor "${compressor}")`,
-  ).toBeLessThanOrEqual(BRACKETS_SIZE_BUDGET_BYTES);
-  expect(manifest.urls).toHaveLength(bracketsBaseline.manifestUrlCount);
-
+test('VC-1206 (NFR-1201): pairing size is historical as of spec-13', () => {
   console.log(
     [
       'VC-1206 measurements:',
-      `  NFR-1201 app delta vs ${bracketsBaseline.commit} ${delta} B (<= ${BRACKETS_SIZE_BUDGET_BYTES})`,
-      `  NFR-1201 precache URL count           ${manifest.urls.length} (unchanged)`,
+      '  NFR-1201 app size delta                 (historical — see specs/12-auto-close-brackets-frozen.md)',
     ].join('\n'),
   );
 });

@@ -61,10 +61,10 @@ failed, and the run's conclusion is the gate's own.
 ### The baselines the runner records for itself
 
 `e2e-chromium` and `audit-perf` run one step before their suite: they build the
-commits VC-408 and the live app-size budgets (NFR-805 and NFR-1201) are pinned
+commits VC-408 and the live app-size budgets (NFR-805 and NFR-1301) are pinned
 to and record the reference measurements on the runner, into `RUNNER_TEMP`.
 The suite then reads them through `PYPLAY_BASELINE_GEOMETRY`,
-`PYPLAY_BASELINE_BUILD`, and `PYPLAY_BASELINE_BRACKETS`. Both jobs check out with
+`PYPLAY_BASELINE_BUILD`, and `PYPLAY_BASELINE_OUTPUT`. Both jobs check out with
 `fetch-depth: 0`,
 because a shallow clone has no baseline commit to build. Each pinned commit is
 read from the committed record it stands in for, so the workflow cannot drift
@@ -73,8 +73,8 @@ from the spec that pins it.
 Size budgets belong to the feature that introduced them. Once that feature
 ships, its measured delta remains historical; a later feature gets a new
 baseline at its own branch point instead of consuming or enlarging an older
-budget. NFR-606, NFR-904, and NFR-1001 are historical, while NFR-805 and
-NFR-1201 remain live at the current spec boundary.
+budget. NFR-606, NFR-904, NFR-1001, and NFR-1201 are historical, while NFR-805
+and NFR-1301 remain live at the current spec boundary.
 
 The references have to come from the runner because both are properties of the
 environment as much as of the build: the panel column's height is a text metric

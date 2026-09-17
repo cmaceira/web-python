@@ -175,26 +175,16 @@ export function mountDiagResizer(options: DiagResizerOptions): DiagResizerHandle
     !consolePanel.hidden && (isVertical() || getEffectiveLayout() === 'horizontal');
 
   const clearHorizontalPlacement = (): void => {
-    resizer.style.position = '';
-    resizer.style.left = '';
-    resizer.style.top = '';
-    resizer.style.width = '';
-    resizer.style.height = '';
-    resizer.style.zIndex = '';
-    resizer.style.margin = '';
+    resizer.style.cssText = '';
   };
 
   const placeOnDiagnosticsTop = (): void => {
     const appRect = app.getBoundingClientRect();
     const diagRect = diagnostics.getBoundingClientRect();
-    const hit = 8;
-    resizer.style.position = 'absolute';
-    resizer.style.left = `${diagRect.left - appRect.left}px`;
-    resizer.style.width = `${diagRect.width}px`;
-    resizer.style.height = `${hit}px`;
-    resizer.style.top = `${diagRect.top - appRect.top - hit / 2}px`;
-    resizer.style.zIndex = '2';
-    resizer.style.margin = '0';
+    resizer.style.cssText =
+      `position:absolute;left:${diagRect.left - appRect.left}px;` +
+      `width:${diagRect.width}px;height:8px;` +
+      `top:${diagRect.top - appRect.top - 4}px;z-index:2;margin:0`;
   };
 
   /**

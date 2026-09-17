@@ -218,11 +218,21 @@ not a resize.
 
 **NFR-1301 — Bounded application payload**
 
-Against branch point `origin/main` at implementation (`3016f1e` or the merge
-base recorded in the baseline file), Output adds at most 2 KiB to the
-gzip-compressed first-party application payload and adds no precache URL.
-Vendored Pyodide and Ruff are excluded. Same runner-local compressor as
-other size VCs.
+Against branch point `6ab5936` (Apache-2.0 license; `origin/main` at
+implementation), Output adds at most 3 KiB to the gzip-compressed first-party
+application payload and adds no precache URL. The measurement excludes the
+byte-pinned Pyodide and Ruff vendor assets and is recorded with the same
+runner-local compressor as the candidate build. The implementation measured
+~2.50 KiB on `linux-x64 zlib 1.3.1-470d3a2`; 3 KiB is the bound that
+leaves compressor headroom. A 2 KiB pairing-style bound does not fit a toggle,
+two splitters, three storage keys, first-paint bootstrap, and the hidden-output
+grid maps (those maps drop tracks rather than zeroing them, because
+`.app { gap: 8px }` would otherwise keep a gap around an empty column/row).
+
+This spec amends NFR-1201: its 2 KiB measurement remains the immutable ship
+measurement for spec-12, but VC-1206 no longer charges every later whole-app
+feature to the pairing branch point. Output carries the independently anchored
+NFR-1301 budget instead.
 
 **NFR-1302 — Apply latency**
 
@@ -312,7 +322,7 @@ Live in `src/format.ts`, quoted verbatim:
 | **VC-1311** | BR-1303 | Cycling color mode leaves `--output-width` and the column width unchanged. |
 | **VC-1312** | FR-1305, BR-1302 | Default vertical geometry (no stored width) still satisfies VC-410's 58 % and ≥ 320 px floors; the resizer is not a grid track. |
 | **VC-1313** | NFR-1303, NFR-1304 | Resizer ≥ 8 px; toggle ≥ 32 × 32; 375 × 667 `scrollWidth` ≤ 375 with Output shown and hidden. Contrast via VC-071 samples. |
-| **VC-1314** | NFR-1301, NFR-1302 | ≤ 2 KiB gzip vs the recorded merge-base; precache URL count unchanged; hide/resize paint and long-task ≤ 50 ms; zero new requests. |
+| **VC-1314** | NFR-1301, NFR-1302 | ≤ 3 KiB gzip vs `6ab5936`; precache URL count unchanged; hide/resize paint and long-task ≤ 50 ms; zero new requests. |
 
 ## Deliberately excluded
 

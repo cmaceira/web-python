@@ -52,16 +52,47 @@ export const OUTPUT_GAP = 8;
 
 export type OutputVisible = 'shown' | 'hidden';
 
+/** Canonical integer string: non-empty decimal, no sign/leading zero/units (FR-1310). */
+const CANONICAL_INT = /^[1-9][0-9]*$/;
+
+function readKey(storage: StorageLike | null, key: string): string | null {
+  if (!storage) return null;
+  try {
+    return storage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function writeKey(storage: StorageLike | null, key: string, value: string): boolean {
+  if (!storage) return false;
+  try {
+    storage.setItem(key, value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function loadCanonicalInt(storage: StorageLike | null, key: string): number | null {
+  const value = readKey(storage, key);
+  if (value === null || !CANONICAL_INT.test(value)) return null;
+  return Number(value);
+}
+
+function saveCanonicalInt(storage: StorageLike | null, key: string, n: number): boolean {
+  const canonical = String(Math.trunc(n));
+  if (!CANONICAL_INT.test(canonical)) return false;
+  return writeKey(storage, key, canonical);
+}
+
 /** Canonical visibility string (FR-1309). */
 export function isCanonicalOutputVisible(raw: string): raw is OutputVisible {
   return raw === 'shown' || raw === 'hidden';
 }
 
-/** Canonical width string: non-empty decimal integer, no sign/leading zero/units (FR-1310). */
-const CANONICAL_WIDTH = /^[1-9][0-9]*$/;
-
 export function isCanonicalOutputWidth(raw: string): boolean {
-  return CANONICAL_WIDTH.test(raw);
+  return CANONICAL_INT.test(raw);
 }
 
 /**
@@ -69,15 +100,8 @@ export function isCanonicalOutputWidth(raw: string): boolean {
  * value → null (caller treats as shown). Never writes.
  */
 export function loadOutputVisible(storage: StorageLike | null): OutputVisible | null {
-  if (!storage) return null;
-  let value: string | null;
-  try {
-    value = storage.getItem(OUTPUT_VISIBLE_KEY);
-  } catch {
-    return null;
-  }
-  if (value === null || !isCanonicalOutputVisible(value)) return null;
-  return value;
+  const value = readKey(storage, OUTPUT_VISIBLE_KEY);
+  return value !== null && isCanonicalOutputVisible(value) ? value : null;
 }
 
 /**
@@ -88,13 +112,7 @@ export function saveOutputVisible(
   storage: StorageLike | null,
   visible: OutputVisible,
 ): boolean {
-  if (!storage) return false;
-  try {
-    storage.setItem(OUTPUT_VISIBLE_KEY, visible);
-    return true;
-  } catch {
-    return false;
-  }
+  return writeKey(storage, OUTPUT_VISIBLE_KEY, visible);
 }
 
 /**
@@ -102,60 +120,28 @@ export function saveOutputVisible(
  * Never writes.
  */
 export function loadOutputWidth(storage: StorageLike | null): number | null {
-  if (!storage) return null;
-  let value: string | null;
-  try {
-    value = storage.getItem(OUTPUT_WIDTH_KEY);
-  } catch {
-    return null;
-  }
-  if (value === null || !isCanonicalOutputWidth(value)) return null;
-  return Number(value);
+  return loadCanonicalInt(storage, OUTPUT_WIDTH_KEY);
 }
 
 /**
  * FR-1307 / FR-1310: persist width as a canonical integer string.
  */
 export function saveOutputWidth(storage: StorageLike | null, width: number): boolean {
-  if (!storage) return false;
-  const canonical = String(Math.trunc(width));
-  if (!isCanonicalOutputWidth(canonical)) return false;
-  try {
-    storage.setItem(OUTPUT_WIDTH_KEY, canonical);
-    return true;
-  } catch {
-    return false;
-  }
+  return saveCanonicalInt(storage, OUTPUT_WIDTH_KEY, width);
 }
 
 /**
  * FR-1315: read the stored stacked console height. Missing / junk → null.
  */
 export function loadConsoleHeight(storage: StorageLike | null): number | null {
-  if (!storage) return null;
-  let value: string | null;
-  try {
-    value = storage.getItem(CONSOLE_HEIGHT_KEY);
-  } catch {
-    return null;
-  }
-  if (value === null || !isCanonicalOutputWidth(value)) return null;
-  return Number(value);
+  return loadCanonicalInt(storage, CONSOLE_HEIGHT_KEY);
 }
 
 /**
  * FR-1315: persist stacked console height as a canonical integer string.
  */
 export function saveConsoleHeight(storage: StorageLike | null, height: number): boolean {
-  if (!storage) return false;
-  const canonical = String(Math.trunc(height));
-  if (!isCanonicalOutputWidth(canonical)) return false;
-  try {
-    storage.setItem(CONSOLE_HEIGHT_KEY, canonical);
-    return true;
-  } catch {
-    return false;
-  }
+  return saveCanonicalInt(storage, CONSOLE_HEIGHT_KEY, height);
 }
 
 /**
@@ -166,20 +152,14 @@ export function maxConsoleHeight(
   editorHeight: number,
   editorMin: number = EDITOR_HEIGHT_MIN,
 ): number {
-  return Math.max(
-    CONSOLE_HEIGHT_MIN,
-    Math.floor(consoleHeight + editorHeight - editorMin),
-  );
+  return Math.max(CONSOLE_HEIGHT_MIN, Math.floor(consoleHeight + editorHeight - editorMin));
 }
 
 /**
  * Clamp an output width into the inclusive [min, max] band (FR-1308).
  * Degenerate (min > max) viewports resolve to `max` via the nested min/max.
  */
-export function clampOutputWidth(
-  width: number,
-  bounds: { min: number; max: number },
-): number {
+export function clampOutputWidth(width: number, bounds: { min: number; max: number }): number {
   return Math.min(bounds.max, Math.max(bounds.min, width));
 }
 
@@ -222,6 +202,22 @@ export interface OutputPaneHandle {
   setStdinPending(pending: boolean): void;
 }
 
+function setAriaRange(el: HTMLElement, min: number, max: number, now: number): void {
+  el.setAttribute('aria-valuemin', String(min));
+  el.setAttribute('aria-valuemax', String(max));
+  el.setAttribute('aria-valuenow', String(now));
+}
+
+function setSizedVar(cssVar: string, flag: string, px: number): void {
+  document.documentElement.style.setProperty(cssVar, `${px}px`);
+  document.documentElement.dataset[flag] = '';
+}
+
+function clearSizedVar(cssVar: string, flag: string): void {
+  document.documentElement.style.removeProperty(cssVar);
+  delete document.documentElement.dataset[flag];
+}
+
 /**
  * Mount the Output toggle + vertical column separator (FR-1301 – FR-1312).
  * Call {@link OutputPaneHandle.sync} from layout render.
@@ -250,6 +246,9 @@ export function mountOutputPane(options: OutputPaneOptions): OutputPaneHandle {
   let currentWidth = 0;
   let currentMin = OUTPUT_WIDTH_MIN;
   let currentMax = OUTPUT_WIDTH_MIN;
+  let currentConsoleHeight = 0;
+  let currentConsoleMin = CONSOLE_HEIGHT_MIN;
+  let currentConsoleMax = CONSOLE_HEIGHT_MIN;
 
   const isResizerActive = (): boolean =>
     visible === 'shown' &&
@@ -259,38 +258,26 @@ export function mountOutputPane(options: OutputPaneOptions): OutputPaneHandle {
   const isConsoleResizerActive = (): boolean =>
     visible === 'shown' && getEffectiveLayout() === 'horizontal';
 
-  let currentConsoleHeight = 0;
-  let currentConsoleMin = CONSOLE_HEIGHT_MIN;
-  let currentConsoleMax = CONSOLE_HEIGHT_MIN;
-
   const applyVisibility = (next: OutputVisible, persist: boolean): void => {
     visible = next;
-    if (next === 'hidden') {
-      document.documentElement.dataset.output = 'hidden';
-    } else {
-      delete document.documentElement.dataset.output;
-    }
+    if (next === 'hidden') document.documentElement.dataset.output = 'hidden';
+    else delete document.documentElement.dataset.output;
     const hideStack = next === 'hidden';
     consolePane.hidden = hideStack;
     diagnosticsPane.hidden = hideStack;
     stdinPane.hidden = hideStack && !stdinPending;
     toggle.setAttribute('aria-expanded', String(next === 'shown'));
-    if (persist) {
-      if (!saveOutputVisible(storage, next) && !visibleSaveWarned) {
-        visibleSaveWarned = true;
-        notices.show(OUTPUT_VISIBLE_SAVE_FAILED);
-      }
+    if (persist && !saveOutputVisible(storage, next) && !visibleSaveWarned) {
+      visibleSaveWarned = true;
+      notices.show(OUTPUT_VISIBLE_SAVE_FAILED);
     }
   };
 
   const applyWidth = (width: number, persist: boolean): void => {
     const clamped = clampOutputWidth(width, { min: currentMin, max: currentMax });
     currentWidth = clamped;
-    document.documentElement.style.setProperty('--output-width', `${clamped}px`);
-    document.documentElement.dataset.outputSized = '';
-    resizer.setAttribute('aria-valuemin', String(currentMin));
-    resizer.setAttribute('aria-valuemax', String(currentMax));
-    resizer.setAttribute('aria-valuenow', String(clamped));
+    setSizedVar('--output-width', 'outputSized', clamped);
+    setAriaRange(resizer, currentMin, currentMax, clamped);
     if (persist) {
       preferredWidth = clamped;
       if (!saveOutputWidth(storage, clamped) && !widthSaveWarned) {
@@ -300,22 +287,14 @@ export function mountOutputPane(options: OutputPaneOptions): OutputPaneHandle {
     }
   };
 
-  const clearSizedWidth = (): void => {
-    document.documentElement.style.removeProperty('--output-width');
-    delete document.documentElement.dataset.outputSized;
-  };
-
   const applyConsoleHeight = (height: number, persist: boolean): void => {
     const clamped = clampOutputWidth(height, {
       min: currentConsoleMin,
       max: currentConsoleMax,
     });
     currentConsoleHeight = clamped;
-    document.documentElement.style.setProperty('--console-height', `${clamped}px`);
-    document.documentElement.dataset.consoleSized = '';
-    consoleResizer.setAttribute('aria-valuemin', String(currentConsoleMin));
-    consoleResizer.setAttribute('aria-valuemax', String(currentConsoleMax));
-    consoleResizer.setAttribute('aria-valuenow', String(clamped));
+    setSizedVar('--console-height', 'consoleSized', clamped);
+    setAriaRange(consoleResizer, currentConsoleMin, currentConsoleMax, clamped);
     if (persist) {
       preferredConsoleHeight = clamped;
       if (!saveConsoleHeight(storage, clamped) && !consoleHeightSaveWarned) {
@@ -323,11 +302,6 @@ export function mountOutputPane(options: OutputPaneOptions): OutputPaneHandle {
         notices.show(CONSOLE_HEIGHT_SAVE_FAILED);
       }
     }
-  };
-
-  const clearSizedConsoleHeight = (): void => {
-    document.documentElement.style.removeProperty('--console-height');
-    delete document.documentElement.dataset.consoleSized;
   };
 
   const measureContentWidth = (): number => {
@@ -361,20 +335,17 @@ export function mountOutputPane(options: OutputPaneOptions): OutputPaneHandle {
     if (currentMin > currentMax) currentMin = currentMax;
 
     if (preferredWidth === null) {
-      // FR-1306: leave `--output-width` unset so CSS keeps the 58 % split;
-      // ARIA still reports the painted column.
-      clearSizedWidth();
-      const painted = Math.round(consolePane.getBoundingClientRect().width);
-      currentWidth = clampOutputWidth(painted, { min: currentMin, max: currentMax });
-      resizer.setAttribute('aria-valuemin', String(currentMin));
-      resizer.setAttribute('aria-valuemax', String(currentMax));
-      resizer.setAttribute('aria-valuenow', String(currentWidth));
+      // FR-1306: leave `--output-width` unset so CSS keeps the 58 % split.
+      clearSizedVar('--output-width', 'outputSized');
+      currentWidth = clampOutputWidth(Math.round(consolePane.getBoundingClientRect().width), {
+        min: currentMin,
+        max: currentMax,
+      });
+      setAriaRange(resizer, currentMin, currentMax, currentWidth);
       return;
     }
-
-    const target = clampOutputWidth(preferredWidth, { min: currentMin, max: currentMax });
     // FR-1308: viewport / layout clamp updates memory + aria only — no storage rewrite.
-    applyWidth(target, false);
+    applyWidth(clampOutputWidth(preferredWidth, { min: currentMin, max: currentMax }), false);
   };
 
   const syncConsoleResizer = (): void => {
@@ -391,14 +362,12 @@ export function mountOutputPane(options: OutputPaneOptions): OutputPaneHandle {
     if (currentConsoleMin > currentConsoleMax) currentConsoleMin = currentConsoleMax;
 
     if (preferredConsoleHeight === null) {
-      clearSizedConsoleHeight();
+      clearSizedVar('--console-height', 'consoleSized');
       currentConsoleHeight = clampOutputWidth(Math.round(consoleH), {
         min: currentConsoleMin,
         max: currentConsoleMax,
       });
-      consoleResizer.setAttribute('aria-valuemin', String(currentConsoleMin));
-      consoleResizer.setAttribute('aria-valuemax', String(currentConsoleMax));
-      consoleResizer.setAttribute('aria-valuenow', String(currentConsoleHeight));
+      setAriaRange(consoleResizer, currentConsoleMin, currentConsoleMax, currentConsoleHeight);
       return;
     }
     applyConsoleHeight(
@@ -418,75 +387,55 @@ export function mountOutputPane(options: OutputPaneOptions): OutputPaneHandle {
     syncConsoleResizer();
   };
 
-  const startResize = (event: PointerEvent): void => {
-    if (isInert(resizer) || !isResizerActive()) return;
-    event.preventDefault();
-    const startX = event.clientX;
-    const startWidth = currentWidth;
-    resizer.setPointerCapture(event.pointerId);
-    // Output is the inline-end column: dragging the start edge right shrinks it.
-    const onMove = (move: PointerEvent): void => {
-      applyWidth(startWidth + (startX - move.clientX), false);
-    };
-    const onEnd = (): void => {
-      resizer.removeEventListener('pointermove', onMove);
-      resizer.removeEventListener('pointerup', onEnd);
-      resizer.removeEventListener('pointercancel', onEnd);
-      applyWidth(currentWidth, true);
-    };
-    resizer.addEventListener('pointermove', onMove);
-    resizer.addEventListener('pointerup', onEnd);
-    resizer.addEventListener('pointercancel', onEnd);
-  };
-
-  const handleKey = (event: KeyboardEvent): void => {
-    if (isInert(resizer) || !isResizerActive()) return;
-    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
-    event.preventDefault();
-    const step = event.shiftKey ? OUTPUT_WIDTH_STEP_LARGE : OUTPUT_WIDTH_STEP;
-    // FR-1305: ArrowRight grows output (`aria-valuenow`).
-    const delta = event.key === 'ArrowRight' ? step : -step;
-    const next = clampOutputWidth(currentWidth + delta, {
-      min: currentMin,
-      max: currentMax,
+  const bindDrag = (
+    el: HTMLElement,
+    axis: 'clientX' | 'clientY',
+    sign: 1 | -1,
+    isActive: () => boolean,
+    apply: (n: number, persist: boolean) => void,
+    current: () => number,
+  ): void => {
+    el.addEventListener('pointerdown', (event: PointerEvent) => {
+      if (isInert(el) || !isActive()) return;
+      event.preventDefault();
+      const origin = event[axis];
+      const start = current();
+      el.setPointerCapture(event.pointerId);
+      const onMove = (move: PointerEvent): void => {
+        apply(start + sign * (move[axis] - origin), false);
+      };
+      const onEnd = (): void => {
+        el.removeEventListener('pointermove', onMove);
+        el.removeEventListener('pointerup', onEnd);
+        el.removeEventListener('pointercancel', onEnd);
+        apply(current(), true);
+      };
+      el.addEventListener('pointermove', onMove);
+      el.addEventListener('pointerup', onEnd);
+      el.addEventListener('pointercancel', onEnd);
     });
-    if (next === currentWidth && preferredWidth !== null) return;
-    applyWidth(next, true);
   };
 
-  const startConsoleResize = (event: PointerEvent): void => {
-    if (isInert(consoleResizer) || !isConsoleResizerActive()) return;
-    event.preventDefault();
-    const startY = event.clientY;
-    const startHeight = currentConsoleHeight;
-    consoleResizer.setPointerCapture(event.pointerId);
-    // Bottom edge: dragging down grows the console.
-    const onMove = (move: PointerEvent): void => {
-      applyConsoleHeight(startHeight + (move.clientY - startY), false);
-    };
-    const onEnd = (): void => {
-      consoleResizer.removeEventListener('pointermove', onMove);
-      consoleResizer.removeEventListener('pointerup', onEnd);
-      consoleResizer.removeEventListener('pointercancel', onEnd);
-      applyConsoleHeight(currentConsoleHeight, true);
-    };
-    consoleResizer.addEventListener('pointermove', onMove);
-    consoleResizer.addEventListener('pointerup', onEnd);
-    consoleResizer.addEventListener('pointercancel', onEnd);
-  };
-
-  const handleConsoleKey = (event: KeyboardEvent): void => {
-    if (isInert(consoleResizer) || !isConsoleResizerActive()) return;
-    if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
-    event.preventDefault();
-    const step = event.shiftKey ? OUTPUT_WIDTH_STEP_LARGE : OUTPUT_WIDTH_STEP;
-    const delta = event.key === 'ArrowDown' ? step : -step;
-    const next = clampOutputWidth(currentConsoleHeight + delta, {
-      min: currentConsoleMin,
-      max: currentConsoleMax,
+  const bindKeys = (
+    el: HTMLElement,
+    grow: string,
+    shrink: string,
+    isActive: () => boolean,
+    apply: (n: number, persist: boolean) => void,
+    current: () => number,
+    bounds: () => { min: number; max: number },
+    preferred: () => number | null,
+  ): void => {
+    el.addEventListener('keydown', (event: KeyboardEvent) => {
+      if (isInert(el) || !isActive()) return;
+      if (event.key !== grow && event.key !== shrink) return;
+      event.preventDefault();
+      const step = event.shiftKey ? OUTPUT_WIDTH_STEP_LARGE : OUTPUT_WIDTH_STEP;
+      const value = current();
+      const next = clampOutputWidth(value + (event.key === grow ? step : -step), bounds());
+      if (next === value && preferred() !== null) return;
+      apply(next, true);
     });
-    if (next === currentConsoleHeight && preferredConsoleHeight !== null) return;
-    applyConsoleHeight(next, true);
   };
 
   toggle.addEventListener('click', () => {
@@ -494,10 +443,37 @@ export function mountOutputPane(options: OutputPaneOptions): OutputPaneHandle {
     syncResizer();
     syncConsoleResizer();
   });
-  resizer.addEventListener('pointerdown', startResize);
-  resizer.addEventListener('keydown', handleKey);
-  consoleResizer.addEventListener('pointerdown', startConsoleResize);
-  consoleResizer.addEventListener('keydown', handleConsoleKey);
+  // Output is the inline-end column: dragging the start edge right shrinks it.
+  bindDrag(resizer, 'clientX', -1, isResizerActive, applyWidth, () => currentWidth);
+  bindKeys(
+    resizer,
+    'ArrowRight',
+    'ArrowLeft',
+    isResizerActive,
+    applyWidth,
+    () => currentWidth,
+    () => ({ min: currentMin, max: currentMax }),
+    () => preferredWidth,
+  );
+  // Bottom edge: dragging down grows the console.
+  bindDrag(
+    consoleResizer,
+    'clientY',
+    1,
+    isConsoleResizerActive,
+    applyConsoleHeight,
+    () => currentConsoleHeight,
+  );
+  bindKeys(
+    consoleResizer,
+    'ArrowDown',
+    'ArrowUp',
+    isConsoleResizerActive,
+    applyConsoleHeight,
+    () => currentConsoleHeight,
+    () => ({ min: currentConsoleMin, max: currentConsoleMax }),
+    () => preferredConsoleHeight,
+  );
   window.addEventListener('resize', sync);
   resizer.setAttribute('aria-label', OUTPUT_RESIZER_LABEL);
   consoleResizer.setAttribute('aria-label', CONSOLE_RESIZER_LABEL);

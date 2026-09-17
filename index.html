@@ -27,49 +27,28 @@
         document.documentElement.style.colorScheme = effective;
       })();
     </script>
-    <!-- FR-910: apply a canonical stored diagnostics height before CSS paint so
-         vertical layout never flashes the old fr share. Non-canonical / missing
-         → leave unset; CSS defaults the track to the content-sized empty
-         minimum (FR-901 / FR-911). Regex matches src/diag-resize.ts
-         isCanonicalDiagHeight. -->
+    <!-- FR-910 / FR-1311: apply stored diagnostics height, Output visibility,
+         column width, and console height before CSS paint. Non-canonical /
+         missing → leave unset. Regex matches isCanonicalDiagHeight /
+         isCanonicalOutputWidth. -->
     <script>
       (function () {
-        var KEY = 'pyplay.diagnostics-height.v1';
+        var re = /^[1-9][0-9]*$/;
+        function px(key, prop, flag) {
+          try {
+            var raw = localStorage.getItem(key);
+            if (raw && re.test(raw)) {
+              document.documentElement.style.setProperty(prop, raw + 'px');
+              document.documentElement.dataset[flag] = '';
+            }
+          } catch (e) {}
+        }
+        px('pyplay.diagnostics-height.v1', '--diagnostics-height', 'diagSized');
+        px('pyplay.output-width.v1', '--output-width', 'outputSized');
+        px('pyplay.console-height.v1', '--console-height', 'consoleSized');
         try {
-          var raw = localStorage.getItem(KEY);
-          if (raw && /^[1-9][0-9]*$/.test(raw)) {
-            document.documentElement.style.setProperty(
-              '--diagnostics-height',
-              raw + 'px',
-            );
-            document.documentElement.dataset.diagSized = '';
-          }
-        } catch (e) {}
-      })();
-    </script>
-    <!-- FR-1311: apply stored Output visibility and column width before CSS
-         paint so a restored `hidden` never flashes the console column and a
-         restored width never flashes FR-409's 58 % split. Regex matches
-         src/output-pane.ts isCanonicalOutputWidth. -->
-    <script>
-      (function () {
-        try {
-          var visible = localStorage.getItem('pyplay.output-visible.v1');
-          if (visible === 'hidden') document.documentElement.dataset.output = 'hidden';
-        } catch (e) {}
-        try {
-          var raw = localStorage.getItem('pyplay.output-width.v1');
-          if (raw && /^[1-9][0-9]*$/.test(raw)) {
-            document.documentElement.style.setProperty('--output-width', raw + 'px');
-            document.documentElement.dataset.outputSized = '';
-          }
-        } catch (e) {}
-        try {
-          var ch = localStorage.getItem('pyplay.console-height.v1');
-          if (ch && /^[1-9][0-9]*$/.test(ch)) {
-            document.documentElement.style.setProperty('--console-height', ch + 'px');
-            document.documentElement.dataset.consoleSized = '';
-          }
+          if (localStorage.getItem('pyplay.output-visible.v1') === 'hidden')
+            document.documentElement.dataset.output = 'hidden';
         } catch (e) {}
       })();
     </script>
@@ -126,16 +105,8 @@
              force and clears it again on the way back up. -->
         <span id="layout-narrow-hint" class="visually-hidden"></span>
         <button id="btn-files" class="btn" type="button" aria-expanded="false" aria-controls="file-pane">Files</button>
-        <!-- FR-1301: immediately after Files, still in the leading cluster.
-             aria-expanded mirrors the hide/show preference, not a pending
-             stdin exception (FR-1303). Never routed through setInert(). -->
-        <button
-          id="btn-output"
-          class="btn"
-          type="button"
-          aria-expanded="true"
-          aria-controls="console-pane stdin-pane diagnostics-pane"
-        >Output</button>
+        <!-- FR-1301 / FR-1303: after Files; aria-expanded is the preference, not stdin. -->
+        <button id="btn-output" class="btn" type="button" aria-expanded="true" aria-controls="console-pane stdin-pane diagnostics-pane">Output</button>
         <!-- FR-301: immediately before the color-mode control. It has no
              disabled state, so unlike Run/Stop/Format it is never routed
              through `setInert()`. -->
@@ -181,19 +152,8 @@
 
       <section id="console-pane" class="panel panel--console" aria-label="Console">
         <div id="console" class="console"></div>
-        <!-- FR-1314: stacked-layout height handle, inside the panel like
-             `#file-resizer`. Hidden + setInert outside horizontal. -->
-        <div
-          id="console-resizer"
-          class="console-resizer"
-          role="separator"
-          aria-orientation="horizontal"
-          aria-label="Resize console panel"
-          aria-valuemin="80"
-          aria-valuemax="80"
-          aria-valuenow="80"
-          tabindex="0"
-        ></div>
+        <!-- FR-1314: stacked height handle, inside the panel like `#file-resizer`. -->
+        <div id="console-resizer" class="console-resizer" role="separator" aria-orientation="horizontal" aria-label="Resize console panel" aria-valuemin="80" aria-valuemax="80" aria-valuenow="80" tabindex="0"></div>
       </section>
 
       <section class="panel panel--editor" aria-label="Editor">
@@ -201,21 +161,8 @@
         <div id="editor" class="editor"></div>
       </section>
 
-      <!-- FR-1305: overlay separator on the output column's inline-start edge.
-           Non-panel sibling immediately after the editor, before #diag-resizer.
-           Visible only in vertical ≥ 900 px with Output shown; mountOutputPane
-           applies setInert. Not a grid track (BR-1302). -->
-      <div
-        id="output-resizer"
-        class="output-resizer"
-        role="separator"
-        aria-orientation="vertical"
-        aria-label="Resize output pane"
-        aria-valuemin="240"
-        aria-valuemax="240"
-        aria-valuenow="240"
-        tabindex="0"
-      ></div>
+      <!-- FR-1305 / BR-1302: overlay on the output column start; not a grid track. -->
+      <div id="output-resizer" class="output-resizer" role="separator" aria-orientation="vertical" aria-label="Resize output pane" aria-valuemin="240" aria-valuemax="240" aria-valuenow="240" tabindex="0"></div>
 
       <!-- FR-913: non-panel sibling immediately after the editor, before stdin.
            Visible only in vertical ≥ 900 px (CSS + hidden); mountDiagResizer

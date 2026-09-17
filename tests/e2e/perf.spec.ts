@@ -278,8 +278,9 @@ interface BaselineBuild {
  * measures from. Spec-06's own NFR-606 ship measurement (7.51 KiB ≤ 9 KB vs
  * `3efb8be`) is immutable and, amended by spec-09, VC-623 no longer subtracts
  * every future whole-app build from that pre-completion baseline — later
- * features carry their own anchored budgets (NFR-805, NFR-904, NFR-1001, NFR-1201).
- * NFR-904 is historical as of spec-10; NFR-1001 is historical as of spec-12.
+ * features carry their own anchored budgets (NFR-805, NFR-904, NFR-1001, NFR-1201, NFR-1301).
+ * NFR-904 is historical as of spec-10; NFR-1001 is historical as of spec-12;
+ * NFR-1201 is historical as of spec-13.
  * Spec-03 shipped at 2.18 KiB over `8df7fa5` and spec-04 at 1.62 KiB over `98ee032`;
  * both are likewise frozen. See `specs/03-vertical-pane-frozen.md` (NFR-305),
  * `specs/04-toogle-pane-aspect-frozen.md` (NFR-405), and
@@ -305,7 +306,7 @@ const branchPoint = JSON.parse(readFileSync(BUILD_RECORD, 'utf8')) as BaselineBu
 const compressor = `${process.platform}-${process.arch} zlib ${process.versions.zlib}`;
 
 /**
- * App-payload size budgets (NFR-805, NFR-1201) measure over the app's own
+ * App-payload size budgets (NFR-805, NFR-1301) measure over the app's own
  * output only — `index.html`, the JS and CSS chunks, the worker chunk,
  * `sw.js`, `precache-manifest.json` — and not over the vendored Pyodide and
  * Ruff blobs, which are held to byte-identity by digest in VC-429 instead.
@@ -521,8 +522,8 @@ test(`VC-623 (NFR-603, NFR-606): completion paints in under ${COMPLETION_PAINT_M
 
   // NFR-606's ≤ 9 KB ship measurement vs `3efb8be` is historical (frozen by
   // spec-09); NFR-904 is historical as of spec-10; NFR-1001 is historical as
-  // of spec-12. Live size budgets are NFR-805 / NFR-1201 against their own
-  // branch points.
+  // of spec-12; NFR-1201 is historical as of spec-13. Live size budgets are
+  // NFR-805 / NFR-1301 against their own branch points.
 
   console.log(
     [
