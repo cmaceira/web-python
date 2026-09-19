@@ -1,10 +1,9 @@
 /**
- * The Format action (FR-043 – FR-045, FR-059, FR-067, BR-006, BR-007).
+ * The Format action (FR-043 – FR-045, FR-059, BR-007).
  *
  * The reformat is one transaction, isolated in the history, so a single undo
- * reverts it in full (FR-044). It touches the editor only: a program already
- * running keeps executing the bytes captured when Run was activated (FR-067,
- * BR-006).
+ * reverts it in full (FR-044). The caller keeps Format inert while a program
+ * is running so execution and editor state cannot race (issue #41).
  */
 import { isolateHistory } from '@codemirror/commands';
 import type { EditorView } from '@codemirror/view';

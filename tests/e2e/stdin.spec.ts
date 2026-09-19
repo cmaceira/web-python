@@ -3,6 +3,7 @@ import { expect, test, type Page } from '@playwright/test';
 import {
   consoleSpans,
   consoleText,
+  editorText,
   programStdout,
   runProgram,
   submitStdin,
@@ -274,8 +275,20 @@ test('VC-033 (FR-032 mid-run): the field stays disabled while the program is not
 
 test('VC-034 (FR-033, FR-064): Stop while suspended on a read', async ({ page }) => {
   await openReady(page);
-  await runProgram(page, 'n = input("Name: ")\nprint("Hi", n)\n');
+  const code = 'n = input("Name: ")\nprint("Hi", n)\n';
+  await runProgram(page, code);
   await expectStdinReady(page);
+
+  // Issue #41: a pending read locks code editing but never the Stop escape hatch.
+  const editor = page.locator('.cm-content');
+  await expect(editor).toHaveAttribute('contenteditable', 'false');
+  await editor.click();
+  await page.keyboard.type('this must not replace the running snapshot');
+  expect(await editorText(page)).toBe(code);
+  await expect(page.getByRole('button', { name: 'Stop' })).toBeEnabled();
+  for (const id of ['btn-format', 'btn-reset', 'btn-file-new', 'btn-file-rename', 'btn-file-delete']) {
+    await expect(page.locator(`#${id}`)).toBeDisabled();
+  }
 
   const startedAt = Date.now();
   await page.getByRole('button', { name: 'Stop' }).click();
@@ -290,6 +303,7 @@ test('VC-034 (FR-033, FR-064): Stop while suspended on a read', async ({ page })
 
   // FR-064: Run comes back within 5.0 s, without a page reload.
   await expect(page.locator('#btn-run')).toBeEnabled({ timeout: 5_000 });
+  await expect(editor).toHaveAttribute('contenteditable', 'true');
   expect(Date.now() - startedAt).toBeLessThan(5_000);
   expect(
     await page.evaluate(

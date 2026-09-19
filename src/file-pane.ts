@@ -1,5 +1,6 @@
 import type { Workspace } from './workspace';
 import { LAST_RUN_LABEL, RUNNING_LABEL } from './format';
+import { isInert, setInert } from './controls';
 
 export interface FilePaneOptions {
   toggle: HTMLButtonElement;
@@ -25,6 +26,7 @@ export class FilePane {
   private desktopInitialized = false;
   private runningFile: string | null = null;
   private lastRunFile: string | null = null;
+  private editingLocked = false;
 
   constructor(private readonly options: FilePaneOptions) {
     const { toggle, pane, nameInput, newButton, renameButton, deleteButton, resizer } = options;
@@ -57,7 +59,7 @@ export class FilePane {
 
   render(workspace: Workspace): void {
     this.workspace = workspace;
-    const { list, renameButton, deleteButton } = this.options;
+    const { list, newButton, renameButton, deleteButton } = this.options;
     const active = workspace.activeFile;
     list.replaceChildren(
       ...workspace.names().map((name) => {
@@ -91,8 +93,9 @@ export class FilePane {
       }),
     );
     const hasActive = active !== null;
-    renameButton.setAttribute('aria-disabled', String(!hasActive));
-    deleteButton.setAttribute('aria-disabled', String(!hasActive));
+    setInert(newButton, this.editingLocked);
+    setInert(renameButton, this.editingLocked || !hasActive);
+    setInert(deleteButton, this.editingLocked || !hasActive);
   }
 
   /** Render the session-only execution state without changing the workspace. */
@@ -102,7 +105,15 @@ export class FilePane {
     if (this.workspace !== null) this.render(this.workspace);
   }
 
+  /** Prevent workspace mutations while execution owns its immutable snapshot. */
+  setEditingLocked(locked: boolean): void {
+    this.editingLocked = locked;
+    if (locked) this.endEdit();
+    if (this.workspace !== null) this.render(this.workspace);
+  }
+
   private begin(mode: Exclude<EditMode, null>): void {
+    if (this.editingLocked) return;
     const { nameInput } = this.options;
     if (mode === 'rename' && this.workspace?.activeFile === null) return;
     this.mode = mode;
@@ -135,6 +146,7 @@ export class FilePane {
   }
 
   private deleteActive(): void {
+    if (this.editingLocked || isInert(this.options.deleteButton)) return;
     const name = this.workspace?.activeFile;
     if (name === null || name === undefined) return;
     if (!window.confirm(`Delete ${name}?`)) return;

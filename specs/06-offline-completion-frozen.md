@@ -23,7 +23,7 @@ always enabled. It neither reads from nor writes to the Pyodide/Ruff workers.
 - Offers current-scope names (incl. Unicode), built-ins, and every CPython 3.13 hard/soft keyword; local names win label collisions; accept inserts exactly the label (no snippet/docs/hover).
 - Auto-opens 100 ms after an identifier prefix and on `Ctrl+Space` (incl. blank line) with best match selected; arrows/page navigate; Enter/Tab/pointer accept; Escape dismisses; Tab without popup stays page traversal (never indents).
 - Suppressed in comments, strings, f-strings (incl. `{…}`), and after `.`; acceptance is one undoable editor transaction observed by autosave/lint.
-- Always on, fully local (no network/worker/storage/API); usable during Python/Ruff load/fail, while running, and offline; Run keeps its activation-time workspace snapshot. Active file + fixed globals only; `@codemirror/autocomplete` 6.20.x stays in the main bundle.
+- Always on, fully local (no network/worker/storage/API); usable during Python/Ruff load/fail and offline. While a program runs, issue #41's editor lock suppresses editing and completion until the run finishes or is stopped. Run keeps its activation-time workspace snapshot. Active file + fixed globals only; `@codemirror/autocomplete` 6.20.x stays in the main bundle.
 
 ## Public interfaces / data
 
@@ -44,6 +44,7 @@ The normative source is [CPython 3.13 `Lib/keyword.py`](https://github.com/pytho
 - Single-file syntactic completion outside Pyodide/Ruff workers — offline and zero new protocol surface.
 - Always enabled, no preference key — avoids a fourth `localStorage` entry.
 - Reuse CodeMirror autocomplete in the existing main bundle at locked 6.20.x — listbox/ARIA without a new asset URL.
+- **Execution-lock amendment (issue #41):** the shipped “usable while running” behavior is superseded. Preventing a completed execution from restoring an older editor snapshot takes precedence; Stop remains available throughout the lock.
 
 ## Known limits (still true at freeze)
 

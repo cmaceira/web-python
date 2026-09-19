@@ -149,18 +149,23 @@ test('VC-612 (FR-609): completion works while Python loads and after runtime fai
   expect(await editorText(page)).toBe('return');
 });
 
-test('VC-613 (FR-609): editing and completion do not alter an executing snapshot', async ({ page }) => {
+test('VC-613 (issue #41): editing and completion are locked while code executes', async ({ page }) => {
   await openPlayground(page);
   await waitForPythonReady(page);
-  await typeProgram(page, 'import time\ntime.sleep(0.5)\nprint("snapshot")');
+  const code = 'import time\ntime.sleep(5)\nprint("snapshot")';
+  await typeProgram(page, code);
   await page.getByRole('button', { name: 'Run' }).click();
 
-  await typeProgram(page, 'pri');
-  await page.keyboard.press('Control+Space');
-  await expect(popup(page)).toBeVisible();
-  await page.keyboard.press('Enter');
-  expect(await editorText(page)).toBe('print');
-  await expect(page.locator('#console')).toContainText('snapshot');
+  const editor = page.locator('.cm-content');
+  await expect(editor).toHaveAttribute('contenteditable', 'false');
+  await editor.press('Control+Space');
+  await expect(popup(page)).toBeHidden();
+  expect(await editorText(page)).toBe(code);
+
+  await page.getByRole('button', { name: 'Stop' }).click();
+  await expect(editor).toHaveAttribute('contenteditable', 'true');
+  await typeProgram(page, 'print("fixed")');
+  expect(await editorText(page)).toBe('print("fixed")');
 });
 
 test('VC-614 (FR-609): completion remains available when Ruff fails', async ({ page }) => {

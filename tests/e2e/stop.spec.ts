@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { consoleText, editorText, runProgram, setProgram, statusText, waitForPythonReady } from './helpers';
+import { consoleText, editorText, runProgram, statusText, waitForPythonReady } from './helpers';
 
 const READY_LINE = /Python 3\.\d+\.\d+ ready/g;
 const TERMINATION = /Program (finished in \d+\.\d{2} s|exited with an error\.)/g;
@@ -186,14 +186,16 @@ test('VC-064 (FR-054): the complete Stop control cycle, inert while disabled', a
 
 test('VC-060 (BR-003): a runaway loop never occupies the main thread', async ({ page }) => {
   await openReady(page);
-  await startRun(page, 'while True: pass\n');
+  const code = 'while True: pass\n';
+  await startRun(page, code);
   await page.waitForTimeout(1000);
 
-  // The editor still takes input while the loop spins in the worker.
-  await setProgram(page, '');
-  await page.locator('.cm-content').click();
+  // Issue #41: the responsive UI keeps the editor locked during execution.
+  const editor = page.locator('.cm-content');
+  await expect(editor).toHaveAttribute('contenteditable', 'false');
+  await editor.click();
   await page.keyboard.type('x = 1');
-  expect(await editorText(page)).toBe('x = 1');
+  expect(await editorText(page)).toBe(code);
 
   // ...and the diagnostics panel still renders and responds.
   const panel = page.locator('.panel--diagnostics');
@@ -203,6 +205,7 @@ test('VC-060 (BR-003): a runaway loop never occupies the main thread', async ({ 
 
   await page.getByRole('button', { name: 'Stop' }).click();
   await expect(page.locator('#btn-run')).toBeEnabled({ timeout: 5_000 });
+  await expect(editor).toHaveAttribute('contenteditable', 'true');
 });
 
 /**

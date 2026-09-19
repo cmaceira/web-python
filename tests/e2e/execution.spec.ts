@@ -197,6 +197,7 @@ test('VC-022 (FR-021): an uncaught exception shows the full traceback and the no
     text.indexOf('Program exited with an error.'),
   );
   expect(text).not.toContain('Program finished in');
+  await expect(page.locator('.cm-content')).toHaveAttribute('contenteditable', 'true');
 });
 
 test('VC-023 (FR-022): a normal return reports a two-decimal duration', async ({ page }) => {
@@ -204,6 +205,7 @@ test('VC-023 (FR-022): a normal return reports a two-decimal duration', async ({
   await runProgram(page, 'pass');
   await waitForTermination(page);
   expect(await consoleText(page)).toMatch(/Program finished in \d+\.\d{2} s/);
+  await expect(page.locator('.cm-content')).toHaveAttribute('contenteditable', 'true');
 });
 
 test('VC-065 (FR-055): empty and comment-only programs finish normally', async ({ page }) => {

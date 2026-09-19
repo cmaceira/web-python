@@ -131,7 +131,7 @@ test('VC-070 (FR-058): without the engine, Format is disabled and inert', async 
   expect(errors).toEqual([]);
 });
 
-test('VC-083 (FR-067, BR-006): formatting mid-run never touches the executing snapshot', async ({
+test('VC-083 (BR-006, issue #41): formatting is unavailable while code is executing', async ({
   page,
 }) => {
   await openPlayground(page);
@@ -143,19 +143,20 @@ test('VC-083 (FR-067, BR-006): formatting mid-run never touches the executing sn
   // Wait until the run is genuinely under way.
   await expect.poll(() => consoleText(page)).toContain('tick');
 
-  // Replace the buffer with a badly formatted, entirely different program and
-  // format it while the run continues.
-  await setProgram(page, 'print( "other" )\n');
-  await page.getByRole('button', { name: 'Format' }).click();
-  await expect.poll(() => editorText(page)).toBe('print("other")\n');
+  const before = await editorText(page);
+  const format = page.getByRole('button', { name: 'Format' });
+  await expect(format).toBeDisabled();
+  await format.dispatchEvent('click');
+  expect(await editorText(page)).toBe(before);
 
   // The run is untouched: it keeps printing `tick`, roughly once per second.
   const ticksBefore = (await programStdout(page)).split('tick').length - 1;
   await page.waitForTimeout(2500);
   const ticksAfter = (await programStdout(page)).split('tick').length - 1;
   expect(ticksAfter).toBeGreaterThan(ticksBefore);
-  expect(await programStdout(page)).not.toContain('other');
+  expect(await editorText(page)).toBe(before);
 
   // Stop the still-running program so the fixture tears down cleanly.
   await page.getByRole('button', { name: 'Stop' }).click();
+  await expect(format).toBeEnabled({ timeout: 5_000 });
 });
