@@ -17,8 +17,8 @@ export const RUN_PYTHON_FILE_LABEL = 'Python file';
 export const EDITOR_RUNNING_HINT = 'Program running — use Stop to edit code.';
 
 /** Issue #41: the stdin placeholder must describe the current read state. */
-export const STDIN_IDLE_HINT = 'El programa no está esperando entrada';
-export const STDIN_WAITING_HINT = 'Esperando entrada…';
+export const STDIN_IDLE_HINT = 'Program is not waiting for input';
+export const STDIN_WAITING_HINT = 'Waiting for input…';
 
 /** FR-022: `Program finished in N.NN s`, wall-clock seconds to two decimals. */
 export function formatFinished(durationMs: number): string {

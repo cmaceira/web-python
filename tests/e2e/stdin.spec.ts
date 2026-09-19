@@ -40,7 +40,7 @@ async function expectStdinReady(page: Page): Promise<void> {
   await expect(stdinField(page)).toBeEnabled();
   await expect(stdinField(page)).toBeFocused();
   await expect(stdinField(page)).toHaveValue('');
-  await expect(stdinField(page)).toHaveAttribute('placeholder', 'Esperando entrada…');
+  await expect(stdinField(page)).toHaveAttribute('placeholder', 'Waiting for input…');
   await expect(page.locator('#btn-eof')).toBeEnabled();
 }
 
@@ -48,7 +48,7 @@ async function expectStdinReady(page: Page): Promise<void> {
 async function expectStdinIdle(page: Page): Promise<void> {
   await expect(stdinField(page)).toBeDisabled();
   await expect(stdinField(page)).toHaveValue('');
-  await expect(stdinField(page)).toHaveAttribute('placeholder', 'El programa no está esperando entrada');
+  await expect(stdinField(page)).toHaveAttribute('placeholder', 'Program is not waiting for input');
   await expect(page.locator('#btn-eof')).toBeDisabled();
 }
 
