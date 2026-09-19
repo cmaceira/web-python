@@ -245,6 +245,7 @@ export function setDoc(view: EditorView, doc: string): void {
 /** A binary workspace file is visible but deliberately cannot be rewritten as text. */
 export function setEditorReadOnly(view: EditorView, readOnly: boolean): void {
   view.dispatch({ effects: editability.reconfigure(editabilityExtensions(readOnly)) });
+  view.contentDOM.setAttribute('aria-readonly', String(readOnly));
 }
 
 /** FR-007: leave the editor contents selected so the visitor can copy manually. */

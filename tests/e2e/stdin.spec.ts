@@ -40,6 +40,7 @@ async function expectStdinReady(page: Page): Promise<void> {
   await expect(stdinField(page)).toBeEnabled();
   await expect(stdinField(page)).toBeFocused();
   await expect(stdinField(page)).toHaveValue('');
+  await expect(stdinField(page)).toHaveAttribute('placeholder', 'Esperando entrada…');
   await expect(page.locator('#btn-eof')).toBeEnabled();
 }
 
@@ -47,6 +48,7 @@ async function expectStdinReady(page: Page): Promise<void> {
 async function expectStdinIdle(page: Page): Promise<void> {
   await expect(stdinField(page)).toBeDisabled();
   await expect(stdinField(page)).toHaveValue('');
+  await expect(stdinField(page)).toHaveAttribute('placeholder', 'El programa no está esperando entrada');
   await expect(page.locator('#btn-eof')).toBeDisabled();
 }
 
@@ -282,6 +284,10 @@ test('VC-034 (FR-033, FR-064): Stop while suspended on a read', async ({ page })
   // Issue #41: a pending read locks code editing but never the Stop escape hatch.
   const editor = page.locator('.cm-content');
   await expect(editor).toHaveAttribute('contenteditable', 'false');
+  await expect(editor).toHaveAttribute('aria-readonly', 'true');
+  const runningHint = page.locator('#editor-running-hint');
+  await expect(runningHint).toBeVisible();
+  await expect(runningHint).toHaveText('Program running — use Stop to edit code.');
   await editor.click();
   await page.keyboard.type('this must not replace the running snapshot');
   expect(await editorText(page)).toBe(code);
@@ -304,6 +310,8 @@ test('VC-034 (FR-033, FR-064): Stop while suspended on a read', async ({ page })
   // FR-064: Run comes back within 5.0 s, without a page reload.
   await expect(page.locator('#btn-run')).toBeEnabled({ timeout: 5_000 });
   await expect(editor).toHaveAttribute('contenteditable', 'true');
+  await expect(editor).toHaveAttribute('aria-readonly', 'false');
+  await expect(runningHint).toBeHidden();
   expect(Date.now() - startedAt).toBeLessThan(5_000);
   expect(
     await page.evaluate(

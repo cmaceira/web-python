@@ -148,7 +148,9 @@
 
       <section class="panel panel--editor" aria-label="Editor">
         <h2 class="editor-heading">Editing: <span id="active-file-name">main.py</span></h2>
-        <div id="editor" class="editor"></div>
+        <div id="editor" class="editor">
+          <p id="editor-running-hint" class="editor-running-hint" role="status" hidden></p>
+        </div>
       </section>
 
       <!-- FR-913: non-panel sibling immediately after the editor, before stdin.

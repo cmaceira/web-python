@@ -27,6 +27,9 @@ import {
   RUN_LABEL,
   RUNNING_LABEL,
   RUN_PYTHON_FILE_LABEL,
+  EDITOR_RUNNING_HINT,
+  STDIN_IDLE_HINT,
+  STDIN_WAITING_HINT,
 } from './format';
 import { mountDiagResizer } from './diag-resize';
 import { CANNOT_FORMAT, formatDocument } from './lint/format-command';
@@ -487,6 +490,7 @@ function boot(): void {
   const runFileName = need('run-file-name');
   const stopBtn = need<HTMLButtonElement>('btn-stop');
   const resetBtn = need<HTMLButtonElement>('btn-reset');
+  const editorRunningHint = need('editor-running-hint');
 
   // FR-026: Clear console removes every console line and leaves the editor
   // completely untouched.
@@ -559,6 +563,10 @@ function boot(): void {
     const active = workspace.activeFile;
     const bytes = active === null ? null : workspace.get(active);
     setEditorReadOnly(view, running || (bytes !== null && !isText(bytes)));
+    editorRunningHint.textContent = running ? EDITOR_RUNNING_HINT : '';
+    editorRunningHint.hidden = !running;
+    if (running) view.contentDOM.setAttribute('aria-describedby', editorRunningHint.id);
+    else view.contentDOM.removeAttribute('aria-describedby');
   }
 
   // --- stdin field (FR-029 – FR-034, FR-060 – FR-062, FR-066) -------------
@@ -571,6 +579,7 @@ function boot(): void {
   /** FR-029: enabled and focused only while a read is actually pending. */
   function stdinPending(mode: StdinMode): void {
     stdinMode = mode;
+    stdinInput.placeholder = STDIN_WAITING_HINT;
     setInert(stdinInput, false);
     setInert(eofBtn, false);
     stdinInput.focus();
@@ -580,6 +589,7 @@ function boot(): void {
   function stdinIdle(): void {
     stdinMode = null;
     stdinInput.value = '';
+    stdinInput.placeholder = STDIN_IDLE_HINT;
     setInert(stdinInput, true);
     setInert(eofBtn, true);
   }

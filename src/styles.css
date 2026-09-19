@@ -472,6 +472,24 @@ body {
   min-height: 120px;
   min-width: 0;
   overflow: auto;
+  position: relative;
+}
+
+.editor-running-hint {
+  background: var(--disabled-bg);
+  border: 1px solid var(--disabled-border);
+  border-radius: 4px;
+  color: var(--disabled-fg);
+  font-size: 12px;
+  font-weight: 600;
+  margin: 0;
+  max-width: calc(100% - 16px);
+  padding: 5px 8px;
+  pointer-events: none;
+  position: absolute;
+  right: 8px;
+  top: 8px;
+  z-index: 2;
 }
 
 .editor-heading {
